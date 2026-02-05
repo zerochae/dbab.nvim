@@ -19,19 +19,28 @@ MySQL, and SQLite databases directly from your editor.
 
 Features:
 - Multi-database support (PostgreSQL, MySQL, SQLite)
-- 4-pane layout (Sidebar, History, Editor, Result)
+- Flexible layout with presets or custom configuration
 - Schema browser with sidebar navigation
 - Query history with timing and re-execution
 - Query editor with multiple tabs
 - Save and organize queries per connection
 - Result viewer with type-aware highlighting
 
-Layout: >
+Layout Presets: >
+
+    "classic" (default):
     ┌─────────────────────┬─────────────────────────────────────┐
     │ Sidebar (20%)       │ Query Editor (80%)                  │
     ├─────────────────────┼─────────────────────────────────────┤
     │ History (20%)       │ Result Viewer (80%)                 │
     └─────────────────────┴─────────────────────────────────────┘
+
+    "wide":
+    ┌─────────────────────┬─────────────────────┬───────────────┐
+    │ Sidebar (33%)       │ Query Editor (34%)  │ History (33%) │
+    ├───────────────────────────────────────────────────────────┤
+    │                    Result Viewer (100%)                   │
+    └───────────────────────────────────────────────────────────┘
 <
 
 ==============================================================================
@@ -81,9 +90,23 @@ ui ~
     UI configuration.
     Type: `Dbab.UIConfig`
 
+    ui.layout ~
+        Layout preset or custom layout array.
+        - `"classic"`: 4-pane layout (default)
+        - `"wide"`: 3-column top + full-width bottom
+        - Custom: Array of rows, e.g., `{ { "sidebar", "editor" }, { "grid" } }`
+
+    ui.sidebar ~
+        - `width`: Sidebar width ratio 0.1~1.0 (default: 0.2)
+
+    ui.history ~
+        - `width`: History width ratio 0.1~1.0 (default: 0.2)
+
     ui.grid ~
         - `max_width`: Maximum grid width (default: 120)
         - `max_height`: Maximum grid height (default: 20)
+        - `show_line_number`: Show line numbers (default: true)
+        - `header_align`: Winbar alignment - "fit" or "full" (default: "fit")
 
                                                            *dbab-config-keymaps*
 keymaps ~
@@ -120,9 +143,15 @@ Example configuration: >lua
         { name = "prod", url = "$DATABASE_URL" },
       },
       ui = {
-        sidebar = { position = "left", width = 0.2 },
-        history = { position = "left", width = 0.2 },
-        grid = { max_width = 120, max_height = 20, show_line_number = true },
+        layout = "classic",  -- "classic", "wide", or custom array
+        sidebar = { width = 0.2 },
+        history = { width = 0.2 },
+        grid = {
+          max_width = 120,
+          max_height = 20,
+          show_line_number = true,
+          header_align = "fit",
+        },
       },
       keymaps = {
         open = "<Leader>db",
@@ -140,6 +169,16 @@ Example configuration: >lua
         short_hints = { "where", "join", "order", "group", "limit" },
       },
     })
+<
+
+Custom layout example: >lua
+    -- No history panel
+    ui = {
+      layout = {
+        { "sidebar", "editor" },
+        { "grid" },
+      },
+    }
 <
 
 ==============================================================================
@@ -240,6 +279,13 @@ Dbab.HistoryConfig ~
     History configuration.
     Fields: `max_entries`, `on_select`, `persist`, `filter_by_connection`,
             `query_display`, `short_hints`
+
+                                                                 *Dbab.Layout*
+Dbab.Layout ~
+    Layout configuration (preset string or custom array).
+    Presets: `"classic"`, `"wide"`
+    Components: `"sidebar"`, `"editor"`, `"history"`, `"grid"`
+    Required: `"editor"` and `"grid"` must be present
 
 ==============================================================================
 vim:tw=78:ts=8:ft=help:norl:

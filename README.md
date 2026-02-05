@@ -5,7 +5,7 @@ A lightweight database client for Neovim. Query databases directly from your edi
 ## Features
 
 - **Multi-database support**: PostgreSQL, MySQL, SQLite
-- **4-pane layout**: Sidebar, History, Editor, Result in organized quadrants
+- **Flexible layout**: Choose from presets or define your own pane arrangement
 - **Schema browser**: Navigate schemas, tables, and columns in sidebar
 - **Query editor**: Write and execute SQL with syntax highlighting
 - **Query history**: Track executed queries with timing, re-execute or load to editor
@@ -15,12 +15,22 @@ A lightweight database client for Neovim. Query databases directly from your edi
 
 ## Layout
 
+### Classic (default)
 ```
 ┌─────────────────────┬─────────────────────────────────────┐
 │ Sidebar (20%)       │ Query Editor (80%)                  │
 ├─────────────────────┼─────────────────────────────────────┤
 │ History (20%)       │ Result Viewer (80%)                 │
 └─────────────────────┴─────────────────────────────────────┘
+```
+
+### Wide
+```
+┌─────────────────────┬─────────────────────┬───────────────┐
+│ Sidebar (33%)       │ Query Editor (34%)  │ History (33%) │
+├───────────────────────────────────────────────────────────┤
+│                    Result Viewer (100%)                   │
+└───────────────────────────────────────────────────────────┘
 ```
 
 ## Requirements
@@ -113,18 +123,20 @@ require("dbab").setup({
     { name = "local", url = "postgres://localhost/mydb" },
   },
   ui = {
-    sidebar = {
-      position = "left",
-      width = 0.2,
-    },
-    history = {
-      position = "left",
-      width = 0.2,
-    },
+    -- Layout preset: "classic" or "wide"
+    layout = "classic",
+    -- Or define custom layout:
+    -- layout = {
+    --   { "sidebar", "editor" },
+    --   { "history", "grid" },
+    -- },
+    sidebar = { width = 0.2 },
+    history = { width = 0.2 },
     grid = {
       max_width = 120,
       max_height = 20,
       show_line_number = true,
+      header_align = "fit",  -- "fit" or "full"
     },
   },
   keymaps = {
@@ -135,15 +147,42 @@ require("dbab").setup({
     show_system_schemas = true,
   },
   history = {
-    max_entries = 100,              -- Max history entries
+    max_entries = 100,
     on_select = "execute",          -- "execute" or "load"
-    persist = true,                 -- Save history to disk
-    filter_by_connection = true,    -- Filter by current connection
+    persist = true,
+    filter_by_connection = true,
     query_display = "auto",         -- "short", "full", or "auto"
     short_hints = { "where", "join", "order", "group", "limit" },
   },
 })
 ```
+
+### Layout Presets
+
+| Preset | Description |
+|--------|-------------|
+| `"classic"` | 4-pane layout (sidebar 20%, history 20%) |
+| `"wide"` | 3-column top + full-width bottom (sidebar 33%, history 33%) |
+
+### Custom Layout
+
+Define your own pane arrangement:
+
+```lua
+-- No history panel
+layout = {
+  { "sidebar", "editor" },
+  { "grid" },
+}
+
+-- Editor on the left
+layout = {
+  { "editor", "sidebar" },
+  { "grid", "history" },
+}
+```
+
+Components: `"sidebar"`, `"editor"`, `"history"`, `"grid"` (editor and grid are required)
 
 ## Connection URL Format
 

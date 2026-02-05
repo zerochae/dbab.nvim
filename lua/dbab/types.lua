@@ -18,18 +18,15 @@
 ---@field url string Database connection URL (supports env vars like $DATABASE_URL)
 
 ---@class Dbab.UIConfig
+---@field layout Dbab.Layout Declarative layout configuration
 ---@field grid Dbab.GridConfig
 ---@field sidebar Dbab.SidebarUIConfig
 ---@field history Dbab.HistoryUIConfig
 
 ---@class Dbab.SidebarUIConfig
----@field position "left"|"right" Sidebar position
 ---@field width number Width as percentage (0.1~1.0)
----@field show_history boolean Show history panel in sidebar bottom
----@field history_ratio number Ratio of sidebar height for history (0.1~0.9)
 
 ---@class Dbab.HistoryUIConfig
----@field position "left"|"right" History panel position
 ---@field width number Width as percentage (0.1~1.0)
 
 ---@alias Dbab.HeaderAlign "fit"|"full"
@@ -160,6 +157,18 @@
 ---@alias SidebarNodeType Dbab.SidebarNodeType
 
 ---@alias Dbab.DatabaseType "postgres"|"mysql"|"sqlite"|"unknown"
+
+---============================================================================
+--- Layout Types
+---============================================================================
+
+---@alias Dbab.LayoutComponent "sidebar"|"editor"|"history"|"grid"
+
+---@alias Dbab.LayoutRow Dbab.LayoutComponent[]
+
+---@alias Dbab.LayoutPreset "classic"|"wide"
+
+---@alias Dbab.Layout Dbab.LayoutRow[]|Dbab.LayoutPreset
 
 ---============================================================================
 --- Highlight Groups (documentation only)

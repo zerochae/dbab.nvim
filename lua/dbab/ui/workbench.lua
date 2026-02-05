@@ -16,6 +16,82 @@ local function get_history_ui()
   return require("dbab.ui.history")
 end
 
+-- Default layout for fallback
+local DEFAULT_LAYOUT = {
+  { "sidebar", "editor" },
+  { "history", "grid" },
+}
+
+--- Validate layout configuration
+---@param layout Dbab.Layout
+---@return boolean valid, string? error_message
+local function validate_layout(layout)
+  if not layout or #layout == 0 then
+    return false, "Layout is empty"
+  end
+
+  local has_editor = false
+  local has_grid = false
+  local seen = {}
+
+  for _, row in ipairs(layout) do
+    if type(row) ~= "table" or #row == 0 then
+      return false, "Invalid row in layout"
+    end
+    for _, comp in ipairs(row) do
+      if seen[comp] then
+        return false, "Duplicate component: " .. comp
+      end
+      seen[comp] = true
+      if comp == "editor" then has_editor = true end
+      if comp == "grid" then has_grid = true end
+    end
+  end
+
+  if not has_editor then
+    return false, "Missing required component: editor"
+  end
+  if not has_grid then
+    return false, "Missing required component: grid"
+  end
+
+  return true, nil
+end
+
+--- Calculate width for each component in a row
+---@param row Dbab.LayoutRow
+---@param total_width number
+---@return table<string, number> component -> width
+local function calculate_row_widths(row, total_width)
+  local cfg = config.get()
+  local fixed_widths = {
+    sidebar = cfg.ui.sidebar.width,
+    history = cfg.ui.history.width,
+  }
+
+  local fixed_total = 0
+  local variable_count = 0
+
+  for _, comp in ipairs(row) do
+    if fixed_widths[comp] then
+      fixed_total = fixed_total + fixed_widths[comp]
+    else
+      variable_count = variable_count + 1
+    end
+  end
+
+  local variable_ratio = (1 - fixed_total) / math.max(1, variable_count)
+
+  local widths = {}
+  for _, comp in ipairs(row) do
+    local ratio = fixed_widths[comp] or variable_ratio
+    widths[comp] = math.floor(total_width * ratio)
+  end
+
+  return widths
+end
+
+
 local M = {}
 
 ---@type number|nil
@@ -934,9 +1010,6 @@ function M.open_saved_query(query_name, content, conn_name)
     end
   end
 
-  -- Ensure editor window exists
-  M._ensure_editor_window()
-
   -- Create new tab
   M.create_new_tab(query_name, content, conn_name, true)
 
@@ -949,9 +1022,6 @@ end
 ---@param raw string
 ---@param elapsed number
 function M.show_result(raw, elapsed)
-  -- Result 창이 없으면 생성
-  M._ensure_result_window()
-
   if not M.result_buf or not vim.api.nvim_buf_is_valid(M.result_buf) then
     return
   end
@@ -1126,12 +1196,6 @@ local function delete_existing_buf(name)
   end
 end
 
----@type number|nil
-M.placeholder_buf = nil
-
----@type number|nil
-M.placeholder_win = nil
-
 function M.open()
   -- 이미 열려있으면 해당 탭으로 이동
   if M.tab_nr and vim.api.nvim_tabpage_is_valid(M.tab_nr) then
@@ -1152,46 +1216,136 @@ function M.open()
   -- 기존 dbab 버퍼 삭제
   delete_existing_buf("[dbab]")
 
+  local cfg = config.get()
+  local layout = cfg.ui.layout or DEFAULT_LAYOUT
+
+  -- Validate layout
+  local valid, err = validate_layout(layout)
+  if not valid then
+    vim.notify("[dbab] Invalid layout: " .. (err or "unknown") .. ". Using default.", vim.log.levels.WARN)
+    layout = DEFAULT_LAYOUT
+  end
+
   -- 새 탭 생성
   vim.cmd("tabnew")
   M.tab_nr = vim.api.nvim_get_current_tabpage()
 
-  -- 초기 상태: Sidebar만 표시
-  -- Editor 열 때 4분할 레이아웃으로 확장
+  local total_width = vim.o.columns
+  local total_height = vim.o.lines - 4
+  local row_count = #layout
+  local row_height = math.floor(total_height / row_count)
 
-  -- 현재 창을 placeholder로 사용 (오른쪽)
-  M.placeholder_win = vim.api.nvim_get_current_win()
-  M.placeholder_buf = vim.api.nvim_get_current_buf()
+  -- 윈도우 맵: component -> window handle
+  local windows = {}
 
-  -- Placeholder 버퍼 설정 (빈 화면)
-  vim.api.nvim_buf_set_option(M.placeholder_buf, "buftype", "nofile")
-  vim.api.nvim_buf_set_option(M.placeholder_buf, "buflisted", false)
-  vim.api.nvim_buf_set_option(M.placeholder_buf, "swapfile", false)
-  vim.api.nvim_buf_set_option(M.placeholder_buf, "modifiable", false)
+  -- Step 1: Row들을 먼저 생성 (수평 분할)
+  -- 현재 창 = 첫 번째 row 전체
+  local row_wins = { vim.api.nvim_get_current_win() }
 
-  -- Sidebar 창 생성 (config에 따라 좌/우)
-  local cfg = config.get()
-  local sidebar_width = math.floor(vim.o.columns * cfg.ui.sidebar.width)
-  local sidebar_split = cfg.ui.sidebar.position == "right" and "right" or "left"
-
-  M.sidebar_buf = vim.api.nvim_create_buf(false, true)
-  M.sidebar_win = vim.api.nvim_open_win(M.sidebar_buf, true, {
-    split = sidebar_split,
-    width = sidebar_width,
-  })
-
-  -- Sidebar 설정
-  get_sidebar().setup(M.sidebar_buf, M.sidebar_win)
-
-  -- show_history=true이고 연결되어 있으면 sidebar 하단에 history 표시
-  if cfg.ui.sidebar.show_history and connection.get_active_url() then
-    M._create_sidebar_history(cfg, sidebar_width)
+  for row_idx = 2, row_count do
+    vim.cmd("belowright split")
+    row_wins[row_idx] = vim.api.nvim_get_current_win()
   end
 
-  -- Sidebar로 포커스
-  vim.api.nvim_set_current_win(M.sidebar_win)
+  -- Step 2: 각 row 내에서 컴포넌트들을 생성 (수직 분할)
+  for row_idx, row in ipairs(layout) do
+    local row_win = row_wins[row_idx]
+    vim.api.nvim_set_current_win(row_win)
 
-  -- Clear previous autocmds and create new group
+    -- 첫 번째 컴포넌트는 현재 row 윈도우 사용
+    windows[row[1]] = row_win
+
+    -- 나머지 컴포넌트들은 vsplit으로 생성
+    for col_idx = 2, #row do
+      local comp = row[col_idx]
+      vim.cmd("belowright vsplit")
+      windows[comp] = vim.api.nvim_get_current_win()
+    end
+  end
+
+  -- Step 3: 각 row 높이 설정 (마지막 row 제외 - 자동으로 나머지 차지)
+  for row_idx = 1, row_count - 1 do
+    local row = layout[row_idx]
+    local first_comp = row[1]
+    if windows[first_comp] and vim.api.nvim_win_is_valid(windows[first_comp]) then
+      vim.api.nvim_win_set_height(windows[first_comp], row_height)
+    end
+  end
+
+  -- Step 4: 각 컴포넌트 너비 설정
+  for _, row in ipairs(layout) do
+    local row_widths = calculate_row_widths(row, total_width)
+    for _, comp in ipairs(row) do
+      local win = windows[comp]
+      if win and vim.api.nvim_win_is_valid(win) then
+        vim.api.nvim_win_set_width(win, row_widths[comp])
+      end
+    end
+  end
+
+  -- Step 5: 각 컴포넌트 초기화
+  M._init_all_components(windows)
+
+  -- Sidebar로 포커스
+  if M.sidebar_win and vim.api.nvim_win_is_valid(M.sidebar_win) then
+    vim.api.nvim_set_current_win(M.sidebar_win)
+  end
+
+  -- Autocmd 설정
+  M._setup_autocmds()
+end
+
+--- Initialize all components in their windows
+---@param windows table<string, number> Component name -> window handle
+function M._init_all_components(windows)
+  local cfg = config.get()
+
+  -- Sidebar
+  if windows.sidebar then
+    M.sidebar_win = windows.sidebar
+    M.sidebar_buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_win_set_buf(M.sidebar_win, M.sidebar_buf)
+    get_sidebar().setup(M.sidebar_buf, M.sidebar_win)
+  end
+
+  -- Editor
+  if windows.editor then
+    M.editor_win = windows.editor
+    -- 첫 번째 쿼리 탭 생성
+    M.create_new_tab(nil, nil, connection.get_active_name(), false)
+  end
+
+  -- Grid (Result)
+  if windows.grid then
+    M.result_win = windows.grid
+    M.result_buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_win_set_buf(M.result_win, M.result_buf)
+    vim.api.nvim_buf_set_name(M.result_buf, "[dbab] Result")
+    vim.api.nvim_buf_set_option(M.result_buf, "filetype", "dbab_result")
+    vim.api.nvim_buf_set_option(M.result_buf, "buftype", "nofile")
+    vim.api.nvim_buf_set_option(M.result_buf, "buflisted", false)
+    vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
+    vim.api.nvim_win_set_option(M.result_win, "cursorline", true)
+    vim.api.nvim_win_set_option(M.result_win, "wrap", false)
+    vim.api.nvim_win_set_option(M.result_win, "number", cfg.ui.grid.show_line_number)
+    vim.api.nvim_win_set_option(M.result_win, "relativenumber", false)
+    M.setup_result_keymaps()
+    vim.schedule(function()
+      M.refresh_result_winbar()
+    end)
+  end
+
+  -- History
+  if windows.history then
+    M.history_win = windows.history
+    M.history_buf = get_history_ui().get_or_create_buf()
+    vim.api.nvim_win_set_buf(M.history_win, M.history_buf)
+    get_history_ui().setup(M.history_win)
+  end
+end
+
+--- Setup autocmds for workbench
+function M._setup_autocmds()
   local augroup = vim.api.nvim_create_augroup("DbabWorkbench", { clear = true })
 
   -- 탭 닫힐 때 정리
@@ -1237,10 +1391,7 @@ function M.open()
     callback = function()
       if M.tab_nr and vim.api.nvim_get_current_tabpage() == M.tab_nr then
         M._resize_layout()
-        -- Re-render history for query truncation
-        local history_ui = require("dbab.ui.history")
-        history_ui.render()
-        -- Re-render result winbar for padding recalculation
+        get_history_ui().render()
         M.refresh_result_winbar()
       end
     end,
@@ -1251,188 +1402,45 @@ function M.open()
     group = augroup,
     callback = function()
       if M.tab_nr and vim.api.nvim_get_current_tabpage() == M.tab_nr then
-        local history_ui = require("dbab.ui.history")
-        history_ui.render()
+        get_history_ui().render()
         M.refresh_result_winbar()
       end
     end,
   })
 end
 
---- Resize layout based on current window size
+--- Resize layout based on current window size and config.ui.layout
 function M._resize_layout()
   local cfg = config.get()
+  local layout = cfg.ui.layout or DEFAULT_LAYOUT
   local total_width = vim.o.columns
   local total_height = vim.o.lines - 4 -- tabline, statusline, cmdline 등 제외
-  local sidebar_width = math.floor(total_width * cfg.ui.sidebar.width)
+  local row_count = #layout
+  local row_height = math.floor(total_height / row_count)
 
-  -- Sidebar width
-  if M.sidebar_win and vim.api.nvim_win_is_valid(M.sidebar_win) then
-    vim.api.nvim_win_set_width(M.sidebar_win, sidebar_width)
-  end
+  -- 컴포넌트 → 윈도우 매핑
+  local comp_to_win = {
+    sidebar = M.sidebar_win,
+    editor = M.editor_win,
+    history = M.history_win,
+    grid = M.result_win,
+  }
 
-  -- History (show_history=true: sidebar 하단, false: 별도 창)
-  if cfg.ui.sidebar.show_history then
-    if M.history_win and vim.api.nvim_win_is_valid(M.history_win) then
-      local history_height = math.floor(total_height * cfg.ui.sidebar.history_ratio)
-      vim.api.nvim_win_set_width(M.history_win, sidebar_width)
-      vim.api.nvim_win_set_height(M.history_win, history_height)
-    end
-  else
-    if M.history_win and vim.api.nvim_win_is_valid(M.history_win) then
-      local history_width = math.floor(total_width * cfg.ui.history.width)
-      vim.api.nvim_win_set_width(M.history_win, history_width)
-    end
-  end
+  -- Row 단위로 크기 조정
+  for row_idx, row in ipairs(layout) do
+    local row_widths = calculate_row_widths(row, total_width)
 
-  -- Result height (50% of total)
-  if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
-    local result_height = math.floor(total_height * 0.5)
-    vim.api.nvim_win_set_height(M.result_win, result_height)
-  end
-end
-
---- Sidebar 하단에 History 패널 생성 (show_history=true일 때)
----@param cfg Dbab.Config
----@param sidebar_width number
-function M._create_sidebar_history(cfg, sidebar_width)
-  if M.history_win and vim.api.nvim_win_is_valid(M.history_win) then
-    return -- 이미 생성됨
-  end
-
-  if not M.sidebar_win or not vim.api.nvim_win_is_valid(M.sidebar_win) then
-    return
-  end
-
-  vim.api.nvim_set_current_win(M.sidebar_win)
-  vim.cmd("belowright split")
-  M.history_win = vim.api.nvim_get_current_win()
-
-  M.history_buf = get_history_ui().get_or_create_buf()
-  vim.api.nvim_win_set_buf(M.history_win, M.history_buf)
-  get_history_ui().setup(M.history_win)
-
-  -- sidebar 컬럼은 전체 높이를 차지하므로 total_height 기준으로 계산
-  local total_height = vim.o.lines - 4
-  local history_height = math.floor(total_height * cfg.ui.sidebar.history_ratio)
-
-  vim.api.nvim_win_set_width(M.history_win, sidebar_width)
-  vim.api.nvim_win_set_height(M.history_win, history_height)
-  vim.api.nvim_win_set_option(M.history_win, "winfixheight", true)
-end
-
---- v6 Layout: 레이아웃 생성
---- show_history=false: 4분할 (Sidebar | Editor / History | Result)
---- show_history=true: 3분할 (Sidebar+History | Editor / Result)
-function M._create_quadrant_layout()
-  if not M.sidebar_win or not vim.api.nvim_win_is_valid(M.sidebar_win) then
-    return
-  end
-
-  -- 이미 레이아웃이 생성되었으면 스킵
-  if M.editor_win and vim.api.nvim_win_is_valid(M.editor_win) then
-    return
-  end
-
-  local cfg = config.get()
-  local total_width = vim.o.columns
-  local total_height = vim.o.lines - 4
-  local sidebar_width = math.floor(total_width * cfg.ui.sidebar.width)
-  local top_height = math.floor(total_height * 0.5)
-
-  -- Placeholder를 Editor로 변환
-  if M.placeholder_win and vim.api.nvim_win_is_valid(M.placeholder_win) then
-    M.editor_win = M.placeholder_win
-    M.placeholder_win = nil
-
-    -- Editor 버퍼 생성
-    local editor_buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_option(editor_buf, "buftype", "nofile")
-    vim.api.nvim_win_set_buf(M.editor_win, editor_buf)
-
-    -- Placeholder 버퍼 삭제
-    if M.placeholder_buf and vim.api.nvim_buf_is_valid(M.placeholder_buf) then
-      pcall(vim.api.nvim_buf_delete, M.placeholder_buf, { force = true })
-      M.placeholder_buf = nil
+    for _, comp in ipairs(row) do
+      local win = comp_to_win[comp]
+      if win and vim.api.nvim_win_is_valid(win) then
+        vim.api.nvim_win_set_width(win, row_widths[comp])
+        -- 마지막 row가 아니면 높이 설정
+        if row_idx < row_count then
+          vim.api.nvim_win_set_height(win, row_height)
+        end
+      end
     end
   end
-
-  -- 하단 분할 (Result)
-  vim.api.nvim_set_current_win(M.editor_win)
-  vim.cmd("botright split")
-  M.result_win = vim.api.nvim_get_current_win()
-
-  -- Result 버퍼 설정
-  M.result_buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_win_set_buf(M.result_win, M.result_buf)
-  vim.api.nvim_buf_set_name(M.result_buf, "[dbab] Result")
-  vim.api.nvim_buf_set_option(M.result_buf, "filetype", "dbab_result")
-  vim.api.nvim_buf_set_option(M.result_buf, "buftype", "nofile")
-  vim.api.nvim_buf_set_option(M.result_buf, "buflisted", false)
-  vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
-  vim.api.nvim_win_set_option(M.result_win, "cursorline", true)
-  vim.api.nvim_win_set_option(M.result_win, "wrap", false)
-  vim.api.nvim_win_set_option(M.result_win, "number", cfg.ui.grid.show_line_number)
-  vim.api.nvim_win_set_option(M.result_win, "relativenumber", false)
-  -- Initial winbar (will be updated by refresh_result_winbar after query execution)
-  vim.schedule(function()
-    M.refresh_result_winbar()
-  end)
-  M.setup_result_keymaps()
-
-  if cfg.ui.sidebar.show_history then
-    -- History가 없으면 생성 (연결 후 처음 에디터 열 때)
-    if not M.history_win or not vim.api.nvim_win_is_valid(M.history_win) then
-      M._create_sidebar_history(cfg, sidebar_width)
-    end
-
-    -- 윈도우 크기 조정
-    vim.api.nvim_win_set_width(M.sidebar_win, sidebar_width)
-    if M.history_win and vim.api.nvim_win_is_valid(M.history_win) then
-      vim.api.nvim_win_set_width(M.history_win, sidebar_width)
-      -- sidebar 컬럼은 전체 높이를 차지하므로 total_height 기준으로 계산
-      local history_height = math.floor(total_height * cfg.ui.sidebar.history_ratio)
-      vim.api.nvim_win_set_height(M.history_win, history_height)
-    end
-    vim.api.nvim_win_set_height(M.result_win, top_height)
-  else
-    -- History를 별도 창으로 표시 (4분할 레이아웃)
-    local history_width = math.floor(total_width * cfg.ui.history.width)
-
-    vim.cmd("vsplit")
-    if cfg.ui.history.position == "left" then
-      vim.cmd("wincmd h")
-    end
-    M.history_win = vim.api.nvim_get_current_win()
-
-    -- History 버퍼 설정
-    M.history_buf = get_history_ui().get_or_create_buf()
-    vim.api.nvim_win_set_buf(M.history_win, M.history_buf)
-    get_history_ui().setup(M.history_win)
-
-    -- 윈도우 크기 조정
-    vim.api.nvim_win_set_width(M.sidebar_win, sidebar_width)
-    vim.api.nvim_win_set_width(M.history_win, history_width)
-    vim.api.nvim_win_set_height(M.result_win, top_height)
-  end
-
-  -- Editor로 돌아가기
-  vim.api.nvim_set_current_win(M.editor_win)
-end
-
---- Ensure editor window exists (v6: 4분할 레이아웃 생성)
-function M._ensure_editor_window()
-  if M.editor_win and vim.api.nvim_win_is_valid(M.editor_win) then
-    return
-  end
-
-  -- 탭이 없으면 먼저 생성
-  if not M.tab_nr or not vim.api.nvim_tabpage_is_valid(M.tab_nr) then
-    M.open()
-  end
-
-  -- 4분할 레이아웃 생성
-  M._create_quadrant_layout()
 end
 
 ---@param query? string
@@ -1441,10 +1449,7 @@ function M.open_editor(query)
     M.open()
   end
 
-  -- Ensure editor window exists
-  M._ensure_editor_window()
-
-  -- Always create a new tab (policy A: query note = new query)
+  -- Create a new query tab
   M.create_new_tab(nil, query, connection.get_active_name(), false)
 
   -- Editor로 포커스 이동
@@ -1458,15 +1463,6 @@ end
 ---@param query string
 function M.open_editor_with_query(query)
   M.open_editor(query)
-end
-
-function M._ensure_result_window()
-  if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
-    return
-  end
-
-  -- 4분할 레이아웃이 없으면 생성
-  M._ensure_editor_window()
 end
 
 function M.setup_result_keymaps()
@@ -1506,25 +1502,6 @@ function M.setup_result_keymaps()
   vim.keymap.set("n", "q", function()
     M.close()
   end, result_opts)
-end
-
--- Legacy: 이전 open() 동작을 원하면 사용
-function M.open_full()
-  M.open()
-  M.open_editor()
-  M._ensure_result_window()
-end
-
--- Dummy for backward compatibility
-function M._setup_keymaps_legacy()
-  -- 탭 닫힐 때 정리
-  vim.api.nvim_create_autocmd("TabClosed", {
-    callback = function()
-      if not vim.api.nvim_tabpage_is_valid(M.tab_nr or 0) then
-        M.cleanup()
-      end
-    end,
-  })
 end
 
 --- Setup keymaps for a specific editor buffer
@@ -1671,8 +1648,6 @@ function M.cleanup()
   M.tab_nr = nil
   M.sidebar_buf = nil
   M.sidebar_win = nil
-  M.placeholder_buf = nil
-  M.placeholder_win = nil
   M.editor_buf = nil
   M.editor_win = nil
   M.result_buf = nil
