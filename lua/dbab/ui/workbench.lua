@@ -1,0 +1,1536 @@
+local executor = require("dbab.core.executor")
+local connection = require("dbab.core.connection")
+local parser = require("dbab.utils.parser")
+local storage = require("dbab.core.storage")
+local query_history = require("dbab.core.history")
+local config = require("dbab.config")
+
+-- Lazy load to avoid circular dependency
+---@return table
+local function get_sidebar()
+  return require("dbab.ui.sidebar")
+end
+
+---@return table
+local function get_history_ui()
+  return require("dbab.ui.history")
+end
+
+local M = {}
+
+---@type number|nil
+M.tab_nr = nil
+
+---@type number|nil
+M.sidebar_buf = nil
+
+---@type number|nil
+M.sidebar_win = nil
+
+---@type number|nil
+M.editor_win = nil
+
+---@type number|nil
+M.result_buf = nil
+
+---@type number|nil
+M.result_win = nil
+
+---@type number|nil
+M.history_buf = nil
+
+---@type number|nil
+M.history_win = nil
+
+-- tabbar is now rendered via winbar on editor_win (no separate buffer/window)
+
+---@type string[]
+M.history = {}
+
+---@type number
+M.history_index = 0
+
+---@type Dbab.QueryResult|nil
+M.last_result = nil
+
+---@type string|nil
+M.last_query = nil
+
+---@type number|nil
+M.last_duration = nil
+
+---@type string|nil
+M.last_conn_name = nil
+
+---@type number|nil
+M.last_timestamp = nil
+
+---@type number|nil
+M.last_grid_width = nil
+
+--- Apply syntax highlighting to SQL query for winbar using treesitter
+---@param query string
+---@return string highlighted query with statusline syntax
+local function highlight_sql_winbar(query)
+  -- Escape % for winbar (must be done on final text segments)
+  local function escape_percent(str)
+    return str:gsub("%%", "%%%%")
+  end
+
+  -- Try to use treesitter for accurate highlighting
+  local ok, ts_parser = pcall(vim.treesitter.get_string_parser, query, "sql")
+  if not ok or not ts_parser then
+    return escape_percent(query)
+  end
+
+  local tree = ts_parser:parse()[1]
+  if not tree then
+    return escape_percent(query)
+  end
+
+  local root = tree:root()
+
+  -- Get highlights query for SQL
+  local hl_query_ok, hl_query = pcall(vim.treesitter.query.get, "sql", "highlights")
+  if not hl_query_ok or not hl_query then
+    return escape_percent(query)
+  end
+
+  -- Collect highlights: {start_col, end_col, hl_group}
+  local highlights = {}
+
+  -- Iterate through captures
+  for id, node in hl_query:iter_captures(root, query, 0, 1) do
+    local name = hl_query.captures[id]
+    local start_row, start_col, end_row, end_col = node:range()
+
+    -- Only handle single-line (row 0)
+    if start_row == 0 and end_row == 0 then
+      -- Use treesitter highlight group directly (e.g., @keyword.sql)
+      local hl_group = "@" .. name .. ".sql"
+      table.insert(highlights, { start_col = start_col, end_col = end_col, hl = hl_group })
+    end
+  end
+
+  -- Sort by start position
+  table.sort(highlights, function(a, b) return a.start_col < b.start_col end)
+
+  -- Build highlighted string
+  local result = ""
+  local pos = 0
+  for _, hl in ipairs(highlights) do
+    -- Add unhighlighted text before this highlight
+    if hl.start_col > pos then
+      result = result .. escape_percent(query:sub(pos + 1, hl.start_col))
+    end
+    -- Add highlighted text (single % for winbar highlight syntax)
+    local text = query:sub(hl.start_col + 1, hl.end_col)
+    result = result .. "%#" .. hl.hl .. "#" .. escape_percent(text) .. "%*"
+    pos = hl.end_col
+  end
+  -- Add remaining text
+  if pos < #query then
+    result = result .. escape_percent(query:sub(pos + 1))
+  end
+
+  return result
+end
+
+--- Get text offset (line number column width) for a window
+---@param win number
+---@return number
+local function get_textoff(win)
+  local wininfo = vim.fn.getwininfo(win)
+  if wininfo and wininfo[1] then
+    return wininfo[1].textoff or 0
+  end
+  return 0
+end
+
+--- Format duration for display
+---@param ms number|nil
+---@return string
+local function format_duration(ms)
+  if not ms then return "" end
+  if ms < 1000 then
+    return string.format("%dms", math.floor(ms))
+  elseif ms < 60000 then
+    return string.format("%.1fs", ms / 1000)
+  else
+    return string.format("%.1fm", ms / 60000)
+  end
+end
+
+-- Result winbar icons
+local result_icons = {
+  db = "󰆼",
+  time = "󰅐",
+  rows = "󰓫",
+  duration = "󱎫",
+}
+
+--- Update result winbar with query info
+function M.refresh_result_winbar()
+  if not M.result_win or not vim.api.nvim_win_is_valid(M.result_win) then
+    return
+  end
+
+  local cfg = config.get()
+
+  -- Get actual text offset (includes line numbers, signs, etc.)
+  local textoff = get_textoff(M.result_win)
+  local indent = string.rep(" ", textoff)
+
+  local winbar_text = "%#DbabHistoryHeader#󰓫 Result%*"
+  if M.last_query then
+    -- Build prefix: [󰆼 dbname]
+    local prefix = ""
+    local prefix_display = ""
+    if M.last_conn_name then
+      prefix = "%#NonText#[%#DbabSidebarIconConnection#" .. result_icons.db .. " %#Normal#" .. M.last_conn_name .. "%#NonText#]%* "
+      prefix_display = "[" .. result_icons.db .. " " .. M.last_conn_name .. "] "
+    end
+
+    -- Build suffix first to calculate available space for query
+    local suffix_parts = {}
+    local suffix_display_parts = {}
+    if M.last_timestamp then
+      local time_str = os.date("%H:%M", M.last_timestamp)
+      table.insert(suffix_parts, "%#Comment#" .. result_icons.time .. " " .. time_str .. "%*")
+      table.insert(suffix_display_parts, result_icons.time .. " " .. time_str)
+    end
+    if M.last_result and M.last_result.row_count then
+      table.insert(suffix_parts, "%#DbabSidebarIconTable#" .. result_icons.rows .. "%* %#DbabNumber#" .. M.last_result.row_count .. " rows%*")
+      table.insert(suffix_display_parts, result_icons.rows .. " " .. M.last_result.row_count .. " rows")
+    end
+    if M.last_duration then
+      table.insert(suffix_parts, "%#Comment#" .. result_icons.duration .. " " .. format_duration(M.last_duration) .. "%*")
+      table.insert(suffix_display_parts, result_icons.duration .. " " .. format_duration(M.last_duration))
+    end
+
+    -- Calculate available width for query
+    local win_width = vim.api.nvim_win_get_width(M.result_win)
+    local available_width = win_width - textoff
+    local grid_width = M.last_grid_width or cfg.ui.grid.max_width
+    local target_width = math.min(grid_width, available_width)
+
+    local prefix_len = vim.fn.strdisplaywidth(prefix_display)
+    local suffix_display = table.concat(suffix_display_parts, "  ")
+    local suffix_len = vim.fn.strdisplaywidth(suffix_display)
+    local min_padding = 2
+
+    -- Available space for query = target_width - prefix - suffix - padding
+    local max_query_len = target_width - prefix_len - suffix_len - min_padding
+    max_query_len = math.max(20, max_query_len) -- minimum 20 chars
+
+    -- Truncate query to fit available space
+    local query = M.last_query:gsub("%s+", " ") -- normalize whitespace
+    if vim.fn.strdisplaywidth(query) > max_query_len then
+      local truncated = ""
+      local len = 0
+      for char_idx = 0, vim.fn.strchars(query) - 1 do
+        local char = vim.fn.strcharpart(query, char_idx, 1)
+        local char_width = vim.fn.strdisplaywidth(char)
+        if len + char_width + 1 > max_query_len then
+          break
+        end
+        truncated = truncated .. char
+        len = len + char_width
+      end
+      query = truncated .. "…"
+    end
+    local highlighted = highlight_sql_winbar(query)
+
+    local suffix = ""
+    if #suffix_parts > 0 then
+      local query_len = vim.fn.strdisplaywidth(query)
+      local content_len = prefix_len + query_len + suffix_len + 2 -- +2 for spacing
+
+      if content_len < target_width then
+        -- Enough space: add padding to align with grid
+        local padding = target_width - content_len
+        suffix = string.rep(" ", padding) .. table.concat(suffix_parts, "  ")
+      else
+        -- Not enough space: use %=  for right alignment
+        suffix = "%=" .. table.concat(suffix_parts, "  ")
+      end
+    end
+
+    winbar_text = prefix .. highlighted .. suffix
+  end
+
+  vim.api.nvim_win_set_option(M.result_win, "winbar", indent .. winbar_text)
+end
+
+--- See lua/dbab/types.lua for type definitions (Dbab.QueryTab)
+
+---@type Dbab.QueryTab[]
+M.query_tabs = {}
+
+---@type number
+M.active_tab = 0
+
+--- Legacy compatibility
+---@type number|nil
+M.editor_buf = nil
+
+-- Tab bar icons
+local icons = {
+  saved = "󰈙 ",      -- SQL file icon
+  unsaved = "󰓰 ",    -- New note icon
+  separator = " ",   -- Tab separator
+}
+
+--- Render the tab bar line for winbar (uses statusline syntax for highlights)
+-- Fixed total tab width (icon + name + padding)
+local TAB_TOTAL_WIDTH = 16
+local ICON_WIDTH = 2 -- nerd font icon display width
+
+--- Truncate name if too long
+---@param name string
+---@param max_width number
+---@return string, number truncated name and its display width
+local function truncate_name(name, max_width)
+  local display_len = vim.fn.strdisplaywidth(name)
+  if display_len <= max_width then
+    return name, display_len
+  end
+
+  -- Truncate with ellipsis
+  local chars = vim.fn.strchars(name)
+  local truncated = ""
+  local len = 0
+  for i = 0, chars - 1 do
+    local char = vim.fn.strcharpart(name, i, 1)
+    local char_width = vim.fn.strdisplaywidth(char)
+    if len + char_width + 1 > max_width then
+      break
+    end
+    truncated = truncated .. char
+    len = len + char_width
+  end
+  return truncated .. "…", len + 1
+end
+
+-- Fixed padding on both sides
+local TAB_PADDING = 2
+
+---@return string
+local function render_tabbar()
+  if #M.query_tabs == 0 then
+    return ""
+  end
+
+  local parts = {}
+  for i, tab in ipairs(M.query_tabs) do
+    local icon = tab.is_saved and icons.saved or icons.unsaved
+    local is_active = i == M.active_tab
+
+    -- Truncate name if needed
+    local max_name_width = TAB_TOTAL_WIDTH - ICON_WIDTH - (TAB_PADDING * 2)
+    local name, _ = truncate_name(tab.name, max_name_width)
+
+    -- Build tab with statusline highlight syntax: %#HighlightGroup#text%*
+    local tab_parts = {}
+
+    -- Left padding + Icon (same highlight)
+    local icon_hl = is_active and "DbabTabActiveIcon" or (tab.is_saved and "DbabTabIconSaved" or "DbabTabIconUnsaved")
+    table.insert(tab_parts, "%#" .. icon_hl .. "#" .. string.rep(" ", TAB_PADDING) .. icon .. "%*")
+
+    -- Name + Right padding (same highlight)
+    local name_hl = is_active and "DbabTabActive" or "DbabTabInactive"
+    table.insert(tab_parts, "%#" .. name_hl .. "#" .. name .. string.rep(" ", TAB_PADDING) .. "%*")
+
+    table.insert(parts, table.concat(tab_parts, ""))
+  end
+
+  return table.concat(parts, icons.separator)
+end
+
+--- Update the tab bar display (via winbar on editor window)
+function M.refresh_tabbar()
+  if not M.editor_win or not vim.api.nvim_win_is_valid(M.editor_win) then
+    return
+  end
+
+  local winbar = render_tabbar()
+  vim.api.nvim_win_set_option(M.editor_win, "winbar", winbar)
+end
+
+--- Refresh history panel (call when connection changes)
+function M.refresh_history()
+  if M.history_win and vim.api.nvim_win_is_valid(M.history_win) then
+    get_history_ui().render()
+  end
+end
+
+--- Get current active tab
+---@return Dbab.QueryTab|nil
+function M.get_active_tab()
+  if M.active_tab > 0 and M.active_tab <= #M.query_tabs then
+    return M.query_tabs[M.active_tab]
+  end
+  return nil
+end
+
+--- Switch to a specific tab
+---@param index number
+function M.switch_tab(index)
+  if index < 1 or index > #M.query_tabs then
+    return
+  end
+
+  M.active_tab = index
+  local tab = M.query_tabs[index]
+
+  -- Update editor buffer
+  if M.editor_win and vim.api.nvim_win_is_valid(M.editor_win) then
+    vim.api.nvim_win_set_buf(M.editor_win, tab.buf)
+    M.editor_buf = tab.buf
+  end
+
+  -- Update buffer name
+  local conn_name = tab.conn_name or connection.get_active_name() or "no connection"
+  local display_name = tab.is_saved and tab.name or ("*" .. tab.name)
+  pcall(vim.api.nvim_buf_set_name, tab.buf, "[dbab] " .. display_name .. " - " .. conn_name)
+
+  M.refresh_tabbar()
+end
+
+--- Switch to next tab
+function M.next_tab()
+  if #M.query_tabs == 0 then
+    return
+  end
+  local next_idx = M.active_tab % #M.query_tabs + 1
+  M.switch_tab(next_idx)
+end
+
+--- Switch to previous tab
+function M.prev_tab()
+  if #M.query_tabs == 0 then
+    return
+  end
+  local prev_idx = (M.active_tab - 2) % #M.query_tabs + 1
+  M.switch_tab(prev_idx)
+end
+
+--- Close current tab
+function M.close_tab()
+  if #M.query_tabs == 0 then
+    return
+  end
+
+  local tab = M.query_tabs[M.active_tab]
+  if tab.modified then
+    vim.ui.select({ "Save", "Don't Save", "Cancel" }, {
+      prompt = "Save changes to '" .. tab.name .. "'?",
+    }, function(choice)
+      if choice == "Save" then
+        M.save_current_query(function(success)
+          if success then
+            M._do_close_tab()
+          end
+        end)
+      elseif choice == "Don't Save" then
+        M._do_close_tab()
+      end
+      -- Cancel: do nothing
+    end)
+  else
+    M._do_close_tab()
+  end
+end
+
+function M._do_close_tab()
+  local tab = M.query_tabs[M.active_tab]
+
+  -- Delete buffer
+  if tab.buf and vim.api.nvim_buf_is_valid(tab.buf) then
+    pcall(vim.api.nvim_buf_delete, tab.buf, { force = true })
+  end
+
+  -- Remove from list
+  table.remove(M.query_tabs, M.active_tab)
+
+  if #M.query_tabs == 0 then
+    -- No more tabs, create a new one
+    M.create_new_tab()
+  else
+    -- Switch to previous or first tab
+    M.active_tab = math.min(M.active_tab, #M.query_tabs)
+    M.switch_tab(M.active_tab)
+  end
+end
+
+--- Create a new query tab
+---@param name? string
+---@param content? string
+---@param conn_name? string
+---@param is_saved? boolean
+---@return number tab_index
+function M.create_new_tab(name, content, conn_name, is_saved)
+  local buf = vim.api.nvim_create_buf(false, true)
+  local conn = conn_name or connection.get_active_name() or "no connection"
+
+  -- Generate unique name for new queries
+  local tab_name = name
+  if not tab_name then
+    local count = 1
+    for _, t in ipairs(M.query_tabs) do
+      if t.name:match("^new query") then
+        count = count + 1
+      end
+    end
+    tab_name = count == 1 and "new query" or ("new query " .. count)
+  end
+
+  ---@type Dbab.QueryTab
+  local tab = {
+    buf = buf,
+    name = tab_name,
+    conn_name = conn,
+    modified = false,
+    is_saved = is_saved or false,
+  }
+
+  table.insert(M.query_tabs, tab)
+  M.active_tab = #M.query_tabs
+
+  -- Setup buffer
+  vim.api.nvim_buf_set_option(buf, "filetype", "sql")
+  vim.api.nvim_buf_set_option(buf, "buftype", "acwrite") -- allows :w via BufWriteCmd
+  vim.api.nvim_buf_set_option(buf, "swapfile", false)
+
+  local display_name = is_saved and tab_name or ("*" .. tab_name)
+  pcall(vim.api.nvim_buf_set_name, buf, "[dbab] " .. display_name .. " - " .. conn)
+
+  -- Set content
+  local lines = content and vim.split(content, "\n") or { "" }
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+
+  -- Handle :w, :wq, :wa commands
+  vim.api.nvim_create_autocmd("BufWriteCmd", {
+    buffer = buf,
+    callback = function()
+      M.save_query_by_buf(buf, function(success)
+        if success then
+          -- Mark buffer as saved (prevents "modified" warning)
+          vim.api.nvim_buf_set_option(buf, "modified", false)
+        end
+      end)
+    end,
+  })
+
+  -- Track modifications
+  vim.api.nvim_buf_attach(buf, false, {
+    on_lines = function()
+      -- Find this tab and mark as modified
+      for _, t in ipairs(M.query_tabs) do
+        if t.buf == buf and not t.modified then
+          t.modified = true
+          M.refresh_tabbar()
+          break
+        end
+      end
+    end,
+  })
+
+  -- Show in editor window
+  if M.editor_win and vim.api.nvim_win_is_valid(M.editor_win) then
+    vim.api.nvim_win_set_buf(M.editor_win, buf)
+    M.editor_buf = buf
+  end
+
+  -- Setup keymaps for this buffer
+  M.setup_editor_keymaps(buf)
+
+  M.refresh_tabbar()
+
+  return #M.query_tabs
+end
+
+---@param result Dbab.QueryResult
+---@param widths number[]
+---@return string[], boolean has_header
+local function render_result_lines(result, widths)
+  local lines = {}
+  local has_header = #result.columns > 0
+
+  -- 헤더 렌더링 (컬럼이 있을 때만)
+  if has_header then
+    local header = ""
+    for i, col in ipairs(result.columns) do
+      local w = widths[i] or #col
+      local padded = col .. string.rep(" ", w - #col)
+      header = header .. " " .. padded .. " "
+    end
+    table.insert(lines, header)
+  end
+
+  -- 데이터 행 (borderless)
+  for _, row in ipairs(result.rows) do
+    local line = ""
+    for i, cell in ipairs(row) do
+      local w = widths[i] or #cell
+      local display = cell == "" and "NULL" or cell
+      local padded = display .. string.rep(" ", w - #display)
+      line = line .. " " .. padded .. " "
+    end
+    table.insert(lines, line)
+  end
+
+  return lines, has_header
+end
+
+---@param bufnr number
+---@param result Dbab.QueryResult
+---@param widths number[]
+---@param has_header boolean
+local function apply_highlights(bufnr, result, widths, has_header)
+  local ns = vim.api.nvim_create_namespace("dbab_result")
+  vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+
+  local header_offset = has_header and 1 or 0
+  local total_lines = #result.rows + header_offset
+
+  -- Header 전체 라인에 DbabHeader 적용 (line 0, 헤더가 있을 때만)
+  if has_header then
+    vim.api.nvim_buf_add_highlight(bufnr, ns, "DbabHeader", 0, 0, -1)
+  end
+
+  -- 데이터 행에만 Zebra striping 적용
+  for line_num = header_offset, total_lines - 1 do
+    local row_idx = line_num - header_offset + 1
+    local row_hl = row_idx % 2 == 1 and "DbabRowOdd" or "DbabRowEven"
+    vim.api.nvim_buf_add_highlight(bufnr, ns, row_hl, line_num, 0, -1)
+  end
+
+  -- 데이터 행 셀별 타입 하이라이팅
+  for row_idx, row in ipairs(result.rows) do
+    local line_num = row_idx - 1 + header_offset -- 0-indexed line
+
+    local col_start = 0
+    for col_idx, cell in ipairs(row) do
+      local w = widths[col_idx] or #cell
+      local cell_start = col_start + 1 -- 앞 공백 이후
+      local display = cell == "" and "NULL" or cell
+
+      local hl_group = nil
+      if cell == "" or cell:upper() == "NULL" then
+        hl_group = "DbabNull"
+      elseif cell:match("^%-?%d+%.?%d*$") then
+        hl_group = "DbabNumber"
+      elseif cell:match("^[Tt]rue$") or cell:match("^[Ff]alse$") or cell == "t" or cell == "f" then
+        hl_group = "DbabBoolean"
+      elseif cell:match("^%d%d%d%d%-%d%d%-%d%d") then
+        -- DateTime: 2024-01-15, 2024-01-15 12:30:00, etc
+        hl_group = "DbabDateTime"
+      elseif cell:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") then
+        -- UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        hl_group = "DbabUuid"
+      elseif cell:match("^[%[{]") then
+        -- JSON: starts with [ or {
+        hl_group = "DbabJson"
+      else
+        hl_group = "DbabString"
+      end
+
+      if hl_group then
+        vim.api.nvim_buf_add_highlight(bufnr, ns, hl_group, line_num, cell_start, cell_start + #display)
+      end
+
+      -- 다음 셀: 공백(1) + value(w) + 공백(1) = w + 2
+      col_start = col_start + w + 2
+    end
+  end
+end
+
+--- Check if result is an error
+---@param raw string
+---@return boolean
+local function is_error_result(raw)
+  return raw:match("^ERROR:") or raw:match("\nERROR:") or raw:match("syntax error")
+end
+
+--- Format error for pretty display
+---@param raw string
+---@return string[] lines, table[] highlights {line, hl_group, col_start, col_end}
+local function format_error(raw)
+  local lines = {}
+  local highlights = {}
+
+  -- Header
+  table.insert(lines, "")
+  table.insert(lines, " ✗ Query Error")
+  table.insert(highlights, { line = 1, hl = "ErrorMsg", col_start = 0, col_end = -1 })
+  table.insert(lines, "")
+
+  -- Split raw into lines for parsing
+  local raw_lines = vim.split(raw, "\n")
+  local found_content = false
+
+  for _, line in ipairs(raw_lines) do
+    if line ~= "" then
+      if line:match("^ERROR:") then
+        -- Error message line
+        local msg = line:match("^ERROR:%s*(.+)") or line
+        table.insert(lines, "   " .. msg)
+        table.insert(highlights, { line = #lines - 1, hl = "Normal", col_start = 0, col_end = -1 })
+        found_content = true
+      elseif line:match("^LINE %d+:") then
+        -- Line info
+        table.insert(lines, "")
+        table.insert(lines, "   → " .. line)
+        table.insert(highlights, { line = #lines - 1, hl = "WarningMsg", col_start = 0, col_end = -1 })
+        found_content = true
+      elseif line:match("^%s*%^%s*$") then
+        -- Pointer line (^)
+        table.insert(lines, "     " .. line)
+        table.insert(highlights, { line = #lines - 1, hl = "Comment", col_start = 0, col_end = -1 })
+        found_content = true
+      elseif found_content then
+        -- Additional context
+        table.insert(lines, "   " .. line)
+        table.insert(highlights, { line = #lines - 1, hl = "Comment", col_start = 0, col_end = -1 })
+      end
+    end
+  end
+
+  -- If parsing failed, show raw error
+  if not found_content then
+    for _, line in ipairs(raw_lines) do
+      if line ~= "" then
+        table.insert(lines, "   " .. line)
+        table.insert(highlights, { line = #lines - 1, hl = "Normal", col_start = 0, col_end = -1 })
+      end
+    end
+  end
+
+  table.insert(lines, "")
+
+  return lines, highlights
+end
+
+--- Save query by buffer number
+---@param buf number
+---@param callback? fun(success: boolean)
+function M.save_query_by_buf(buf, callback)
+  local tab = nil
+  for _, t in ipairs(M.query_tabs) do
+    if t.buf == buf then
+      tab = t
+      break
+    end
+  end
+  if not tab then
+    if callback then callback(false) end
+    return
+  end
+
+  local conn_name = tab.conn_name or connection.get_active_name()
+  if not conn_name then
+    vim.notify("[dbab] No connection for query", vim.log.levels.WARN)
+    if callback then callback(false) end
+    return
+  end
+
+  -- Get content
+  local lines = vim.api.nvim_buf_get_lines(tab.buf, 0, -1, false)
+  local content = table.concat(lines, "\n")
+
+  local function do_save(name)
+    local ok, err = storage.save_query(conn_name, name, content)
+    if ok then
+      tab.name = name
+      tab.modified = false
+      tab.is_saved = true
+      M.refresh_tabbar()
+      get_sidebar().refresh()
+      vim.notify("[dbab] Saved: " .. name, vim.log.levels.INFO)
+      if callback then callback(true) end
+    else
+      vim.notify("[dbab] Save failed: " .. (err or "unknown"), vim.log.levels.ERROR)
+      if callback then callback(false) end
+    end
+  end
+
+  -- If already saved, just save with same name
+  if tab.is_saved then
+    do_save(tab.name)
+  else
+    -- Prompt for name (vim.schedule for proper focus with UI plugins like snacks.nvim)
+    vim.schedule(function()
+      vim.ui.input({
+        prompt = "Query name: ",
+        default = tab.name:match("^new query") and "" or tab.name,
+      }, function(input)
+      if input and input ~= "" then
+        -- Check if already exists
+        if storage.query_exists(conn_name, input) then
+          vim.ui.select({ "Overwrite", "Cancel" }, {
+            prompt = "Query '" .. input .. "' already exists",
+          }, function(choice)
+            if choice == "Overwrite" then
+              do_save(input)
+            else
+              if callback then callback(false) end
+            end
+          end)
+        else
+          do_save(input)
+        end
+      else
+        if callback then callback(false) end
+      end
+      end)
+    end)
+  end
+end
+
+--- Save current query to disk
+---@param callback? fun(success: boolean)
+function M.save_current_query(callback)
+  local tab = M.get_active_tab()
+  if not tab then
+    vim.notify("[dbab] No active query tab", vim.log.levels.WARN)
+    if callback then callback(false) end
+    return
+  end
+  M.save_query_by_buf(tab.buf, callback)
+end
+
+--- Open a saved query in a new tab
+---@param query_name string
+---@param content string
+---@param conn_name string
+function M.open_saved_query(query_name, content, conn_name)
+  if not M.tab_nr or not vim.api.nvim_tabpage_is_valid(M.tab_nr) then
+    M.open()
+  end
+
+  -- Check if already open
+  for i, tab in ipairs(M.query_tabs) do
+    if tab.name == query_name and tab.conn_name == conn_name and tab.is_saved then
+      M.switch_tab(i)
+      -- Focus editor
+      if M.editor_win and vim.api.nvim_win_is_valid(M.editor_win) then
+        vim.api.nvim_set_current_win(M.editor_win)
+      end
+      return
+    end
+  end
+
+  -- Ensure editor window exists
+  M._ensure_editor_window()
+
+  -- Create new tab
+  M.create_new_tab(query_name, content, conn_name, true)
+
+  -- Focus editor
+  if M.editor_win and vim.api.nvim_win_is_valid(M.editor_win) then
+    vim.api.nvim_set_current_win(M.editor_win)
+  end
+end
+
+---@param raw string
+---@param elapsed number
+function M.show_result(raw, elapsed)
+  -- Result 창이 없으면 생성
+  M._ensure_result_window()
+
+  if not M.result_buf or not vim.api.nvim_buf_is_valid(M.result_buf) then
+    return
+  end
+
+  vim.api.nvim_buf_set_option(M.result_buf, "modifiable", true)
+
+  -- 에러인 경우 별도 처리 (예쁜 에러 포맷)
+  if is_error_result(raw) then
+    local lines, highlights = format_error(raw)
+
+    vim.api.nvim_buf_set_lines(M.result_buf, 0, -1, false, lines)
+    vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
+
+    -- 에러 표시시 line number 숨김
+    if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
+      vim.api.nvim_win_set_option(M.result_win, "number", false)
+      vim.api.nvim_win_set_option(M.result_win, "relativenumber", false)
+    end
+
+    -- 하이라이트 적용
+    local ns = vim.api.nvim_create_namespace("dbab_result")
+    vim.api.nvim_buf_clear_namespace(M.result_buf, ns, 0, -1)
+    for _, hl in ipairs(highlights) do
+      vim.api.nvim_buf_add_highlight(M.result_buf, ns, hl.hl, hl.line, hl.col_start, hl.col_end)
+    end
+
+    vim.notify("[dbab] Query error", vim.log.levels.ERROR)
+    return
+  end
+
+  -- 정상 결과시 line number 설정 (config 기반)
+  if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
+    local cfg = config.get()
+    vim.api.nvim_win_set_option(M.result_win, "number", cfg.ui.grid.show_line_number)
+  end
+
+  local result = parser.parse(raw)
+  M.last_result = result
+
+  if #result.rows == 0 then
+    vim.api.nvim_buf_set_lines(M.result_buf, 0, -1, false, { "No results returned" })
+    vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
+    return
+  end
+
+  local widths = parser.calculate_column_widths(result)
+  local lines, has_header = render_result_lines(result, widths)
+
+  -- Calculate actual grid width from column widths
+  local grid_width = 0
+  for _, w in ipairs(widths) do
+    grid_width = grid_width + w + 2 -- +2 for " " padding on each side
+  end
+  M.last_grid_width = grid_width
+
+  vim.api.nvim_buf_set_lines(M.result_buf, 0, -1, false, lines)
+  vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
+
+  -- 하이라이팅 적용
+  apply_highlights(M.result_buf, result, widths, has_header)
+
+  -- winbar 업데이트 (실행된 쿼리 표시)
+  M.refresh_result_winbar()
+
+  -- 상태라인 업데이트
+  local status = string.format(" Result: %d rows (%.1fms) ", result.row_count, elapsed)
+  vim.notify(status, vim.log.levels.INFO)
+
+  -- 커서를 result grid로 이동
+  if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
+    vim.api.nvim_set_current_win(M.result_win)
+    -- 첫 번째 데이터 행으로 이동 (헤더 다음)
+    pcall(vim.api.nvim_win_set_cursor, M.result_win, { 2, 0 })
+    -- Normal mode 유지
+    vim.cmd("stopinsert")
+  end
+end
+
+function M.execute_query()
+  if not M.editor_buf or not vim.api.nvim_buf_is_valid(M.editor_buf) then
+    return
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(M.editor_buf, 0, -1, false)
+  local query = table.concat(lines, "\n")
+  query = vim.trim(query)
+
+  if query == "" then
+    vim.notify("[dbab] Empty query", vim.log.levels.WARN)
+    return
+  end
+
+  local url = connection.get_active_url()
+  if not url then
+    vim.notify("[dbab] No active connection", vim.log.levels.WARN)
+    return
+  end
+
+  -- 커맨드 히스토리 저장 (이전/다음 쿼리 탐색용)
+  table.insert(M.history, 1, query)
+  if #M.history > 100 then
+    table.remove(M.history)
+  end
+  M.history_index = 0
+
+  local start_time = vim.loop.hrtime()
+  local result = executor.execute(url, query)
+  local elapsed = (vim.loop.hrtime() - start_time) / 1e6
+
+  -- Query History에 추가 (v6 history pane용)
+  local parsed_result = parser.parse(result)
+  query_history.add({
+    query = query,
+    timestamp = os.time(),
+    conn_name = connection.get_active_name() or "unknown",
+    duration_ms = elapsed,
+    row_count = parsed_result and parsed_result.row_count or 0,
+  })
+
+  -- History UI 새로고침
+  if M.history_win and vim.api.nvim_win_is_valid(M.history_win) then
+    get_history_ui().render()
+  end
+
+  M.last_query = query
+  M.last_duration = elapsed
+  M.last_conn_name = connection.get_active_name()
+  M.last_timestamp = os.time()
+  M.show_result(result, elapsed)
+end
+
+---@return number|nil 기존에 같은 이름의 버퍼가 있으면 삭제
+local function delete_existing_buf(name)
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(buf) then
+      local buf_name = vim.api.nvim_buf_get_name(buf)
+      if buf_name:match(vim.pesc(name)) then
+        pcall(vim.api.nvim_buf_delete, buf, { force = true })
+      end
+    end
+  end
+end
+
+---@type number|nil
+M.placeholder_buf = nil
+
+---@type number|nil
+M.placeholder_win = nil
+
+function M.open()
+  -- 이미 열려있으면 해당 탭으로 이동
+  if M.tab_nr and vim.api.nvim_tabpage_is_valid(M.tab_nr) then
+    local tabs = vim.api.nvim_list_tabpages()
+    for i, tab in ipairs(tabs) do
+      if tab == M.tab_nr then
+        vim.cmd("tabnext " .. i)
+        return
+      end
+    end
+  end
+
+  -- 이전 상태 정리 (탭은 닫혔지만 상태가 남아있는 경우)
+  if M.tab_nr then
+    M.cleanup()
+  end
+
+  -- 기존 dbab 버퍼 삭제
+  delete_existing_buf("[dbab]")
+
+  -- 새 탭 생성
+  vim.cmd("tabnew")
+  M.tab_nr = vim.api.nvim_get_current_tabpage()
+
+  -- 초기 상태: Sidebar만 표시
+  -- Editor 열 때 4분할 레이아웃으로 확장
+
+  -- 현재 창을 placeholder로 사용 (오른쪽)
+  M.placeholder_win = vim.api.nvim_get_current_win()
+  M.placeholder_buf = vim.api.nvim_get_current_buf()
+
+  -- Placeholder 버퍼 설정 (빈 화면)
+  vim.api.nvim_buf_set_option(M.placeholder_buf, "buftype", "nofile")
+  vim.api.nvim_buf_set_option(M.placeholder_buf, "buflisted", false)
+  vim.api.nvim_buf_set_option(M.placeholder_buf, "swapfile", false)
+  vim.api.nvim_buf_set_option(M.placeholder_buf, "modifiable", false)
+
+  -- Sidebar 창 생성 (config에 따라 좌/우)
+  local cfg = config.get()
+  local sidebar_width = math.floor(vim.o.columns * cfg.ui.sidebar.width)
+  local sidebar_split = cfg.ui.sidebar.position == "right" and "right" or "left"
+
+  M.sidebar_buf = vim.api.nvim_create_buf(false, true)
+  M.sidebar_win = vim.api.nvim_open_win(M.sidebar_buf, true, {
+    split = sidebar_split,
+    width = sidebar_width,
+  })
+
+  -- Sidebar 설정
+  get_sidebar().setup(M.sidebar_buf, M.sidebar_win)
+
+  -- show_history=true이고 연결되어 있으면 sidebar 하단에 history 표시
+  if cfg.ui.sidebar.show_history and connection.get_active_url() then
+    M._create_sidebar_history(cfg, sidebar_width)
+  end
+
+  -- Sidebar로 포커스
+  vim.api.nvim_set_current_win(M.sidebar_win)
+
+  -- Clear previous autocmds and create new group
+  local augroup = vim.api.nvim_create_augroup("DbabWorkbench", { clear = true })
+
+  -- 탭 닫힐 때 정리
+  vim.api.nvim_create_autocmd("TabClosed", {
+    group = augroup,
+    callback = function()
+      if not vim.api.nvim_tabpage_is_valid(M.tab_nr or 0) then
+        M.cleanup()
+      end
+    end,
+  })
+
+  -- 창이 닫힐 때 상태 정리
+  vim.api.nvim_create_autocmd("WinClosed", {
+    group = augroup,
+    callback = function(ev)
+      -- 현재 탭이 아니면 무시
+      if M.tab_nr and vim.api.nvim_get_current_tabpage() ~= M.tab_nr then
+        return
+      end
+
+      local closed_win = tonumber(ev.match)
+      -- 에디터 창이 닫힌 경우
+      if closed_win == M.editor_win then
+        M.editor_win = nil
+        M.editor_buf = nil
+      end
+      -- 사이드바가 닫힌 경우 전체 정리
+      if closed_win == M.sidebar_win then
+        vim.schedule(function()
+          if M.tab_nr and vim.api.nvim_tabpage_is_valid(M.tab_nr) then
+            pcall(vim.cmd, "tabclose")
+          end
+          M.cleanup()
+        end)
+      end
+    end,
+  })
+
+  -- 윈도우 리사이즈 시 레이아웃 재조정
+  vim.api.nvim_create_autocmd("VimResized", {
+    group = augroup,
+    callback = function()
+      if M.tab_nr and vim.api.nvim_get_current_tabpage() == M.tab_nr then
+        M._resize_layout()
+        -- Re-render history for query truncation
+        local history_ui = require("dbab.ui.history")
+        history_ui.render()
+        -- Re-render result winbar for padding recalculation
+        M.refresh_result_winbar()
+      end
+    end,
+  })
+end
+
+--- Resize layout based on current window size
+function M._resize_layout()
+  local cfg = config.get()
+  local total_width = vim.o.columns
+  local total_height = vim.o.lines - 4 -- tabline, statusline, cmdline 등 제외
+  local sidebar_width = math.floor(total_width * cfg.ui.sidebar.width)
+
+  -- Sidebar width
+  if M.sidebar_win and vim.api.nvim_win_is_valid(M.sidebar_win) then
+    vim.api.nvim_win_set_width(M.sidebar_win, sidebar_width)
+  end
+
+  -- History (show_history=true: sidebar 하단, false: 별도 창)
+  if cfg.ui.sidebar.show_history then
+    if M.history_win and vim.api.nvim_win_is_valid(M.history_win) then
+      local history_height = math.floor(total_height * cfg.ui.sidebar.history_ratio)
+      vim.api.nvim_win_set_width(M.history_win, sidebar_width)
+      vim.api.nvim_win_set_height(M.history_win, history_height)
+    end
+  else
+    if M.history_win and vim.api.nvim_win_is_valid(M.history_win) then
+      local history_width = math.floor(total_width * cfg.ui.history.width)
+      vim.api.nvim_win_set_width(M.history_win, history_width)
+    end
+  end
+
+  -- Result height (50% of total)
+  if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
+    local result_height = math.floor(total_height * 0.5)
+    vim.api.nvim_win_set_height(M.result_win, result_height)
+  end
+end
+
+--- Sidebar 하단에 History 패널 생성 (show_history=true일 때)
+---@param cfg Dbab.Config
+---@param sidebar_width number
+function M._create_sidebar_history(cfg, sidebar_width)
+  if M.history_win and vim.api.nvim_win_is_valid(M.history_win) then
+    return -- 이미 생성됨
+  end
+
+  if not M.sidebar_win or not vim.api.nvim_win_is_valid(M.sidebar_win) then
+    return
+  end
+
+  vim.api.nvim_set_current_win(M.sidebar_win)
+  vim.cmd("belowright split")
+  M.history_win = vim.api.nvim_get_current_win()
+
+  M.history_buf = get_history_ui().get_or_create_buf()
+  vim.api.nvim_win_set_buf(M.history_win, M.history_buf)
+  get_history_ui().setup(M.history_win)
+
+  -- sidebar 컬럼은 전체 높이를 차지하므로 total_height 기준으로 계산
+  local total_height = vim.o.lines - 4
+  local history_height = math.floor(total_height * cfg.ui.sidebar.history_ratio)
+
+  vim.api.nvim_win_set_width(M.history_win, sidebar_width)
+  vim.api.nvim_win_set_height(M.history_win, history_height)
+  vim.api.nvim_win_set_option(M.history_win, "winfixheight", true)
+end
+
+--- v6 Layout: 레이아웃 생성
+--- show_history=false: 4분할 (Sidebar | Editor / History | Result)
+--- show_history=true: 3분할 (Sidebar+History | Editor / Result)
+function M._create_quadrant_layout()
+  if not M.sidebar_win or not vim.api.nvim_win_is_valid(M.sidebar_win) then
+    return
+  end
+
+  -- 이미 레이아웃이 생성되었으면 스킵
+  if M.editor_win and vim.api.nvim_win_is_valid(M.editor_win) then
+    return
+  end
+
+  local cfg = config.get()
+  local total_width = vim.o.columns
+  local total_height = vim.o.lines - 4
+  local sidebar_width = math.floor(total_width * cfg.ui.sidebar.width)
+  local top_height = math.floor(total_height * 0.5)
+
+  -- Placeholder를 Editor로 변환
+  if M.placeholder_win and vim.api.nvim_win_is_valid(M.placeholder_win) then
+    M.editor_win = M.placeholder_win
+    M.placeholder_win = nil
+
+    -- Editor 버퍼 생성
+    local editor_buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_option(editor_buf, "buftype", "nofile")
+    vim.api.nvim_win_set_buf(M.editor_win, editor_buf)
+
+    -- Placeholder 버퍼 삭제
+    if M.placeholder_buf and vim.api.nvim_buf_is_valid(M.placeholder_buf) then
+      pcall(vim.api.nvim_buf_delete, M.placeholder_buf, { force = true })
+      M.placeholder_buf = nil
+    end
+  end
+
+  -- 하단 분할 (Result)
+  vim.api.nvim_set_current_win(M.editor_win)
+  vim.cmd("botright split")
+  M.result_win = vim.api.nvim_get_current_win()
+
+  -- Result 버퍼 설정
+  M.result_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_win_set_buf(M.result_win, M.result_buf)
+  vim.api.nvim_buf_set_name(M.result_buf, "[dbab] Result")
+  vim.api.nvim_buf_set_option(M.result_buf, "filetype", "dbab_result")
+  vim.api.nvim_buf_set_option(M.result_buf, "buftype", "nofile")
+  vim.api.nvim_buf_set_option(M.result_buf, "buflisted", false)
+  vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
+  vim.api.nvim_win_set_option(M.result_win, "cursorline", true)
+  vim.api.nvim_win_set_option(M.result_win, "wrap", false)
+  vim.api.nvim_win_set_option(M.result_win, "number", cfg.ui.grid.show_line_number)
+  vim.api.nvim_win_set_option(M.result_win, "relativenumber", false)
+  -- Initial winbar (will be updated by refresh_result_winbar after query execution)
+  vim.schedule(function()
+    M.refresh_result_winbar()
+  end)
+  M.setup_result_keymaps()
+
+  if cfg.ui.sidebar.show_history then
+    -- History가 없으면 생성 (연결 후 처음 에디터 열 때)
+    if not M.history_win or not vim.api.nvim_win_is_valid(M.history_win) then
+      M._create_sidebar_history(cfg, sidebar_width)
+    end
+
+    -- 윈도우 크기 조정
+    vim.api.nvim_win_set_width(M.sidebar_win, sidebar_width)
+    if M.history_win and vim.api.nvim_win_is_valid(M.history_win) then
+      vim.api.nvim_win_set_width(M.history_win, sidebar_width)
+      -- sidebar 컬럼은 전체 높이를 차지하므로 total_height 기준으로 계산
+      local history_height = math.floor(total_height * cfg.ui.sidebar.history_ratio)
+      vim.api.nvim_win_set_height(M.history_win, history_height)
+    end
+    vim.api.nvim_win_set_height(M.result_win, top_height)
+  else
+    -- History를 별도 창으로 표시 (4분할 레이아웃)
+    local history_width = math.floor(total_width * cfg.ui.history.width)
+
+    vim.cmd("vsplit")
+    if cfg.ui.history.position == "left" then
+      vim.cmd("wincmd h")
+    end
+    M.history_win = vim.api.nvim_get_current_win()
+
+    -- History 버퍼 설정
+    M.history_buf = get_history_ui().get_or_create_buf()
+    vim.api.nvim_win_set_buf(M.history_win, M.history_buf)
+    get_history_ui().setup(M.history_win)
+
+    -- 윈도우 크기 조정
+    vim.api.nvim_win_set_width(M.sidebar_win, sidebar_width)
+    vim.api.nvim_win_set_width(M.history_win, history_width)
+    vim.api.nvim_win_set_height(M.result_win, top_height)
+  end
+
+  -- Editor로 돌아가기
+  vim.api.nvim_set_current_win(M.editor_win)
+end
+
+--- Ensure editor window exists (v6: 4분할 레이아웃 생성)
+function M._ensure_editor_window()
+  if M.editor_win and vim.api.nvim_win_is_valid(M.editor_win) then
+    return
+  end
+
+  -- 탭이 없으면 먼저 생성
+  if not M.tab_nr or not vim.api.nvim_tabpage_is_valid(M.tab_nr) then
+    M.open()
+  end
+
+  -- 4분할 레이아웃 생성
+  M._create_quadrant_layout()
+end
+
+---@param query? string
+function M.open_editor(query)
+  if not M.tab_nr or not vim.api.nvim_tabpage_is_valid(M.tab_nr) then
+    M.open()
+  end
+
+  -- Ensure editor window exists
+  M._ensure_editor_window()
+
+  -- Always create a new tab (policy A: query note = new query)
+  M.create_new_tab(nil, query, connection.get_active_name(), false)
+
+  -- Editor로 포커스 이동
+  if M.editor_win and vim.api.nvim_win_is_valid(M.editor_win) then
+    vim.api.nvim_set_current_win(M.editor_win)
+    -- Insert 모드로 시작
+    vim.cmd("startinsert!")
+  end
+end
+
+---@param query string
+function M.open_editor_with_query(query)
+  M.open_editor(query)
+end
+
+function M._ensure_result_window()
+  if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
+    return
+  end
+
+  -- 4분할 레이아웃이 없으면 생성
+  M._ensure_editor_window()
+end
+
+function M.setup_result_keymaps()
+  if not M.result_buf then
+    return
+  end
+
+  local result_opts = { noremap = true, silent = true, buffer = M.result_buf }
+
+  -- Tab: History로 이동 (v6: Result → History)
+  vim.keymap.set("n", "<Tab>", function()
+    if M.history_win and vim.api.nvim_win_is_valid(M.history_win) then
+      vim.api.nvim_set_current_win(M.history_win)
+    elseif M.sidebar_win and vim.api.nvim_win_is_valid(M.sidebar_win) then
+      vim.api.nvim_set_current_win(M.sidebar_win)
+    end
+  end, result_opts)
+
+  -- S-Tab: Editor로 이동
+  vim.keymap.set("n", "<S-Tab>", function()
+    if M.editor_win and vim.api.nvim_win_is_valid(M.editor_win) then
+      vim.api.nvim_set_current_win(M.editor_win)
+    end
+  end, result_opts)
+
+  -- y: 현재 행 yank (JSON)
+  vim.keymap.set("n", "y", function()
+    M.yank_current_row()
+  end, result_opts)
+
+  -- Y: 전체 yank (JSON)
+  vim.keymap.set("n", "Y", function()
+    M.yank_all_rows()
+  end, result_opts)
+
+  -- q: 닫기
+  vim.keymap.set("n", "q", function()
+    M.close()
+  end, result_opts)
+end
+
+-- Legacy: 이전 open() 동작을 원하면 사용
+function M.open_full()
+  M.open()
+  M.open_editor()
+  M._ensure_result_window()
+end
+
+-- Dummy for backward compatibility
+function M._setup_keymaps_legacy()
+  -- 탭 닫힐 때 정리
+  vim.api.nvim_create_autocmd("TabClosed", {
+    callback = function()
+      if not vim.api.nvim_tabpage_is_valid(M.tab_nr or 0) then
+        M.cleanup()
+      end
+    end,
+  })
+end
+
+--- Setup keymaps for a specific editor buffer
+---@param buf number
+function M.setup_editor_keymaps(buf)
+  if not buf or not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+
+  local opts = { noremap = true, silent = true, buffer = buf }
+
+  -- Enter: 쿼리 실행 (Normal mode)
+  vim.keymap.set("n", "<CR>", function()
+    M.execute_query()
+  end, opts)
+
+  -- Ctrl+Enter: 쿼리 실행 (Insert mode에서도)
+  vim.keymap.set("i", "<C-CR>", function()
+    M.execute_query()
+  end, opts)
+
+  -- Leader+r: 쿼리 실행
+  vim.keymap.set("n", "<Leader>r", function()
+    M.execute_query()
+  end, opts)
+
+  -- Ctrl+s: 저장
+  vim.keymap.set("n", "<C-s>", function()
+    M.save_current_query()
+  end, opts)
+
+  vim.keymap.set("i", "<C-s>", function()
+    vim.cmd("stopinsert")
+    M.save_current_query()
+  end, opts)
+
+  -- gt: 다음 탭
+  vim.keymap.set("n", "gt", function()
+    M.next_tab()
+  end, opts)
+
+  -- gT: 이전 탭
+  vim.keymap.set("n", "gT", function()
+    M.prev_tab()
+  end, opts)
+
+  -- Leader+w: 탭 닫기 (C-w는 vim 윈도우 관리와 충돌)
+  vim.keymap.set("n", "<Leader>w", function()
+    M.close_tab()
+  end, opts)
+
+  -- Tab: Result로 이동 (Editor -> Result)
+  vim.keymap.set("n", "<Tab>", function()
+    if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
+      vim.api.nvim_set_current_win(M.result_win)
+    elseif M.sidebar_win and vim.api.nvim_win_is_valid(M.sidebar_win) then
+      vim.api.nvim_set_current_win(M.sidebar_win)
+    end
+  end, opts)
+
+  -- S-Tab: Sidebar로 이동 (Editor -> Sidebar)
+  vim.keymap.set("n", "<S-Tab>", function()
+    if M.sidebar_win and vim.api.nvim_win_is_valid(M.sidebar_win) then
+      vim.api.nvim_set_current_win(M.sidebar_win)
+    end
+  end, opts)
+
+  -- q: 닫기
+  vim.keymap.set("n", "q", function()
+    M.close()
+  end, opts)
+end
+
+function M.setup_keymaps()
+  -- Legacy: setup keymaps for current editor_buf
+  if M.editor_buf then
+    M.setup_editor_keymaps(M.editor_buf)
+  end
+end
+
+function M.yank_current_row()
+  if not M.last_result or not M.result_win then
+    return
+  end
+
+  local cursor = vim.api.nvim_win_get_cursor(M.result_win)
+  local row_idx = cursor[1] - 1 -- 헤더만 건너뜀 (borderless)
+
+  if row_idx < 1 or row_idx > #M.last_result.rows then
+    vim.notify("[dbab] No data row selected", vim.log.levels.WARN)
+    return
+  end
+
+  local row = M.last_result.rows[row_idx]
+  local obj = {}
+  for i, col in ipairs(M.last_result.columns) do
+    obj[col] = row[i]
+  end
+
+  local json = vim.fn.json_encode(obj)
+  vim.fn.setreg("+", json)
+  vim.fn.setreg('"', json)
+  vim.notify("[dbab] Row copied as JSON", vim.log.levels.INFO)
+end
+
+function M.yank_all_rows()
+  if not M.last_result then
+    return
+  end
+
+  local arr = {}
+  for _, row in ipairs(M.last_result.rows) do
+    local obj = {}
+    for i, col in ipairs(M.last_result.columns) do
+      obj[col] = row[i]
+    end
+    table.insert(arr, obj)
+  end
+
+  local json = vim.fn.json_encode(arr)
+  vim.fn.setreg("+", json)
+  vim.fn.setreg('"', json)
+  vim.notify("[dbab] All rows copied as JSON", vim.log.levels.INFO)
+end
+
+function M.close()
+  if M.tab_nr and vim.api.nvim_tabpage_is_valid(M.tab_nr) then
+    vim.cmd("tabclose")
+  end
+  M.cleanup()
+end
+
+function M.cleanup()
+  get_sidebar().cleanup()
+  get_history_ui().cleanup()
+
+  -- Clean up all query tab buffers
+  for _, tab in ipairs(M.query_tabs) do
+    if tab.buf and vim.api.nvim_buf_is_valid(tab.buf) then
+      pcall(vim.api.nvim_buf_delete, tab.buf, { force = true })
+    end
+  end
+
+  M.tab_nr = nil
+  M.sidebar_buf = nil
+  M.sidebar_win = nil
+  M.placeholder_buf = nil
+  M.placeholder_win = nil
+  M.editor_buf = nil
+  M.editor_win = nil
+  M.result_buf = nil
+  M.result_win = nil
+  M.history_buf = nil
+  M.history_win = nil
+  M.last_result = nil
+  M.last_query = nil
+  M.last_duration = nil
+  M.last_conn_name = nil
+  M.last_timestamp = nil
+  M.last_grid_width = nil
+  M.query_tabs = {}
+  M.active_tab = 0
+end
+
+return M

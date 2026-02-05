@@ -1,0 +1,25 @@
+---
+base: lua51
+name: vim
+globals:
+  vim:
+    any: true
+  # Busted/luassert test globals
+  describe:
+    any: true
+  it:
+    any: true
+  before_each:
+    any: true
+  after_each:
+    any: true
+  pending:
+    any: true
+  spy:
+    any: true
+  stub:
+    any: true
+  mock:
+    any: true
+  assert:
+    any: true

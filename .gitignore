@@ -1,0 +1,20 @@
+# Claude Code
+.claude/
+
+# Internal docs/planning
+docs/issues/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Test artifacts
+luacov.stats.out
+luacov.report.out
+
+# Local Neovim files
+.nvim.lua
+.nvimrc
+.exrc

@@ -1,0 +1,245 @@
+*dbab.txt*  A lightweight database client for Neovim
+
+==============================================================================
+CONTENTS                                                        *dbab-contents*
+
+    1. Introduction ............................ |dbab-introduction|
+    2. Requirements ............................ |dbab-requirements|
+    3. Installation ............................ |dbab-installation|
+    4. Configuration ........................... |dbab-configuration|
+    5. Commands ................................ |dbab-commands|
+    6. Keymaps ................................. |dbab-keymaps|
+    7. Types ................................... |dbab-types|
+
+==============================================================================
+INTRODUCTION                                                *dbab-introduction*
+
+dbab.nvim is a lightweight database client for Neovim. Query PostgreSQL,
+MySQL, and SQLite databases directly from your editor.
+
+Features:
+- Multi-database support (PostgreSQL, MySQL, SQLite)
+- 4-pane layout (Sidebar, History, Editor, Result)
+- Schema browser with sidebar navigation
+- Query history with timing and re-execution
+- Query editor with multiple tabs
+- Save and organize queries per connection
+- Result viewer with type-aware highlighting
+
+Layout: >
+    ┌─────────────────────┬─────────────────────────────────────┐
+    │ Sidebar (20%)       │ Query Editor (80%)                  │
+    ├─────────────────────┼─────────────────────────────────────┤
+    │ History (20%)       │ Result Viewer (80%)                 │
+    └─────────────────────┴─────────────────────────────────────┘
+<
+
+==============================================================================
+REQUIREMENTS                                                *dbab-requirements*
+
+- Neovim >= 0.9.0
+- nui.nvim (https://github.com/MunifTanjim/nui.nvim)
+- Database CLI tools:
+  - `psql` for PostgreSQL
+  - `mysql` for MySQL
+  - `sqlite3` for SQLite
+
+==============================================================================
+INSTALLATION                                                *dbab-installation*
+
+Using lazy.nvim: >lua
+    {
+      "zerochae/dbab.nvim",
+      dependencies = { "MunifTanjim/nui.nvim" },
+      config = function()
+        require("dbab").setup({
+          connections = {
+            { name = "local", url = "postgres://localhost/mydb" },
+          },
+        })
+      end,
+    }
+<
+
+==============================================================================
+CONFIGURATION                                              *dbab-configuration*
+
+Call `require("dbab").setup(opts)` with the following options:
+
+                                                        *dbab-config-connections*
+connections ~
+    List of database connections.
+    Type: `Dbab.Connection[]`
+    Default: `{}`
+
+    Each connection has:
+    - `name`: Display name for the connection
+    - `url`: Database connection URL (supports env vars like `$DATABASE_URL`)
+
+                                                                *dbab-config-ui*
+ui ~
+    UI configuration.
+    Type: `Dbab.UIConfig`
+
+    ui.grid ~
+        - `max_width`: Maximum grid width (default: 120)
+        - `max_height`: Maximum grid height (default: 20)
+
+                                                           *dbab-config-keymaps*
+keymaps ~
+    Global keymap configuration.
+    Type: `Dbab.Keymaps`
+
+    - `open`: Keymap to open dbab (default: "<Leader>db")
+    - `execute`: Keymap to execute query (default: "<CR>")
+    - `close`: Keymap to close (default: "<Esc>")
+
+                                                            *dbab-config-schema*
+schema ~
+    Schema display configuration.
+    Type: `Dbab.SchemaConfig`
+
+    - `show_system_schemas`: Show system schemas (default: true)
+
+                                                           *dbab-config-history*
+history ~
+    History panel configuration.
+    Type: `Dbab.HistoryConfig`
+
+    - `max_entries`: Maximum history entries (default: 100)
+    - `on_select`: Action on Enter key - "execute" or "load" (default: "execute")
+    - `persist`: Save history to disk (default: true)
+    - `filter_by_connection`: Filter by current connection (default: true)
+    - `query_display`: How to display query - "short", "full", "auto" (default: "auto")
+    - `short_hints`: Hints to show in short mode (default: {"where","join","order","group","limit"})
+
+Example configuration: >lua
+    require("dbab").setup({
+      connections = {
+        { name = "local", url = "postgres://localhost/mydb" },
+        { name = "prod", url = "$DATABASE_URL" },
+      },
+      ui = {
+        sidebar = { position = "left", width = 0.2 },
+        history = { position = "left", width = 0.2 },
+        grid = { max_width = 120, max_height = 20, show_line_number = true },
+      },
+      keymaps = {
+        open = "<Leader>db",
+        execute = "<CR>",
+      },
+      schema = {
+        show_system_schemas = true,
+      },
+      history = {
+        max_entries = 100,
+        on_select = "execute",
+        persist = true,
+        filter_by_connection = true,
+        query_display = "auto",
+        short_hints = { "where", "join", "order", "group", "limit" },
+      },
+    })
+<
+
+==============================================================================
+COMMANDS                                                        *dbab-commands*
+
+                                                                        *:Dbab*
+:Dbab                   Open the dbab sidebar. If already open, switches to
+                        the dbab tab.
+
+                                                                   *:DbabClose*
+:DbabClose              Close dbab and clean up all windows.
+
+==============================================================================
+KEYMAPS                                                          *dbab-keymaps*
+
+SIDEBAR KEYMAPS                                          *dbab-keymaps-sidebar*
+
+    `<CR>` or `o`       Toggle node expansion or open query
+    `<Tab>`             Move focus to editor window
+    `S`                 Generate SELECT * query for table
+    `i`                 Generate INSERT template for table
+    `d`                 Delete saved query (with confirmation)
+    `q`                 Close dbab
+
+EDITOR KEYMAPS                                            *dbab-keymaps-editor*
+
+    `<CR>`              Execute query (normal mode)
+    `<C-CR>`            Execute query (insert mode)
+    `<C-s>`             Save current query
+    `gt`                Next tab
+    `gT`                Previous tab
+    `<Leader>w`         Close current tab
+    `<Tab>`             Move focus to result window
+    `<S-Tab>`           Move focus to sidebar
+    `q`                 Close dbab
+
+HISTORY KEYMAPS                                          *dbab-keymaps-history*
+
+    `<CR>`              Load or execute query (based on config)
+    `R`                 Re-execute query immediately
+    `y`                 Copy query to clipboard
+    `d`                 Delete entry (with confirmation)
+    `C`                 Clear all history (with confirmation)
+    `<Tab>`             Move focus to sidebar
+    `<S-Tab>`           Move focus to result
+    `q`                 Close dbab
+
+RESULT KEYMAPS                                            *dbab-keymaps-result*
+
+    `y`                 Yank current row as JSON
+    `Y`                 Yank all rows as JSON
+    `<Tab>`             Move focus to sidebar
+    `<S-Tab>`           Move focus to editor
+    `q`                 Close dbab
+
+==============================================================================
+TYPES                                                              *dbab-types*
+
+All type definitions are in `lua/dbab/types.lua`.
+
+                                                                 *Dbab.Config*
+Dbab.Config ~
+    Main configuration type.
+    Fields: `connections`, `ui`, `keymaps`, `schema`
+
+                                                             *Dbab.Connection*
+Dbab.Connection ~
+    Database connection configuration.
+    Fields: `name` (string), `url` (string)
+
+                                                                 *Dbab.Schema*
+Dbab.Schema ~
+    Database schema information.
+    Fields: `name` (string), `table_count` (number)
+
+                                                                  *Dbab.Table*
+Dbab.Table ~
+    Table information.
+    Fields: `name` (string), `type` ("table" | "view")
+
+                                                                 *Dbab.Column*
+Dbab.Column ~
+    Column information.
+    Fields: `name`, `data_type`, `is_nullable`, `is_primary`
+
+                                                            *Dbab.QueryResult*
+Dbab.QueryResult ~
+    Query execution result.
+    Fields: `columns`, `rows`, `row_count`, `raw`
+
+                                                           *Dbab.HistoryEntry*
+Dbab.HistoryEntry ~
+    History entry information.
+    Fields: `query`, `timestamp`, `conn_name`, `duration_ms`, `row_count`
+
+                                                          *Dbab.HistoryConfig*
+Dbab.HistoryConfig ~
+    History configuration.
+    Fields: `max_entries`, `on_select`, `persist`, `filter_by_connection`,
+            `query_display`, `short_hints`
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
