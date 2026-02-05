@@ -115,10 +115,24 @@ local function highlight_sql_winbar(query)
   -- Sort by start position
   table.sort(highlights, function(a, b) return a.start_col < b.start_col end)
 
+  -- Remove overlapping highlights (keep the first one)
+  local filtered = {}
+  local last_end = -1
+  for _, hl in ipairs(highlights) do
+    if hl.start_col >= last_end then
+      table.insert(filtered, hl)
+      last_end = hl.end_col
+    end
+  end
+
   -- Build highlighted string
   local result = ""
   local pos = 0
-  for _, hl in ipairs(highlights) do
+  for _, hl in ipairs(filtered) do
+    -- Skip if highlight starts before current position (shouldn't happen after filtering)
+    if hl.start_col < pos then
+      goto continue
+    end
     -- Add unhighlighted text before this highlight
     if hl.start_col > pos then
       result = result .. escape_percent(query:sub(pos + 1, hl.start_col))
@@ -127,6 +141,7 @@ local function highlight_sql_winbar(query)
     local text = query:sub(hl.start_col + 1, hl.end_col)
     result = result .. "%#" .. hl.hl .. "#" .. escape_percent(text) .. "%*"
     pos = hl.end_col
+    ::continue::
   end
   -- Add remaining text
   if pos < #query then
@@ -208,55 +223,75 @@ function M.refresh_result_winbar()
       table.insert(suffix_display_parts, result_icons.duration .. " " .. format_duration(M.last_duration))
     end
 
-    -- Calculate available width for query
+    -- Calculate target width based on header_align setting
     local win_width = vim.api.nvim_win_get_width(M.result_win)
     local available_width = win_width - textoff
-    local grid_width = M.last_grid_width or cfg.ui.grid.max_width
-    local target_width = math.min(grid_width, available_width)
+    local header_align = cfg.ui.grid.header_align or "fit"
+
+    local target_width
+    if header_align == "full" then
+      -- Align to window edge
+      target_width = available_width
+    else
+      -- "fit": align to grid width
+      local grid_width = M.last_grid_width or cfg.ui.grid.max_width
+      target_width = math.min(grid_width, available_width)
+    end
 
     local prefix_len = vim.fn.strdisplaywidth(prefix_display)
     local suffix_display = table.concat(suffix_display_parts, "  ")
     local suffix_len = vim.fn.strdisplaywidth(suffix_display)
-    local min_padding = 2
 
-    -- Available space for query = target_width - prefix - suffix - padding
-    local max_query_len = target_width - prefix_len - suffix_len - min_padding
-    max_query_len = math.max(20, max_query_len) -- minimum 20 chars
+    -- Calculate where suffix should start (aligned to grid edge)
+    local suffix_start_pos = target_width - suffix_len
+    local query_space = suffix_start_pos - prefix_len - 2  -- -2 for spacing
 
     -- Truncate query to fit available space
     local query = M.last_query:gsub("%s+", " ") -- normalize whitespace
-    if vim.fn.strdisplaywidth(query) > max_query_len then
-      local truncated = ""
-      local len = 0
-      for char_idx = 0, vim.fn.strchars(query) - 1 do
-        local char = vim.fn.strcharpart(query, char_idx, 1)
-        local char_width = vim.fn.strdisplaywidth(char)
-        if len + char_width + 1 > max_query_len then
-          break
+    local query_len = vim.fn.strdisplaywidth(query)
+
+    if query_space < 10 then
+      -- Not enough space: just show metadata aligned to window right
+      local highlighted = highlight_sql_winbar(query)
+      if query_len > 30 then
+        -- Truncate to 30 chars
+        local truncated = ""
+        local len = 0
+        for char_idx = 0, vim.fn.strchars(query) - 1 do
+          local char = vim.fn.strcharpart(query, char_idx, 1)
+          local char_width = vim.fn.strdisplaywidth(char)
+          if len + char_width + 1 > 30 then
+            break
+          end
+          truncated = truncated .. char
+          len = len + char_width
         end
-        truncated = truncated .. char
-        len = len + char_width
+        highlighted = highlight_sql_winbar(truncated .. "…")
       end
-      query = truncated .. "…"
-    end
-    local highlighted = highlight_sql_winbar(query)
-
-    local suffix = ""
-    if #suffix_parts > 0 then
-      local query_len = vim.fn.strdisplaywidth(query)
-      local content_len = prefix_len + query_len + suffix_len + 2 -- +2 for spacing
-
-      if content_len < target_width then
-        -- Enough space: add padding to align with grid
-        local padding = target_width - content_len
-        suffix = string.rep(" ", padding) .. table.concat(suffix_parts, "  ")
-      else
-        -- Not enough space: use %=  for right alignment
-        suffix = "%=" .. table.concat(suffix_parts, "  ")
+      winbar_text = prefix .. highlighted .. "%=" .. table.concat(suffix_parts, "  ")
+    else
+      -- Enough space: align suffix to grid edge
+      if query_len > query_space then
+        local truncated = ""
+        local len = 0
+        for char_idx = 0, vim.fn.strchars(query) - 1 do
+          local char = vim.fn.strcharpart(query, char_idx, 1)
+          local char_width = vim.fn.strdisplaywidth(char)
+          if len + char_width + 1 > query_space then
+            break
+          end
+          truncated = truncated .. char
+          len = len + char_width
+        end
+        query = truncated .. "…"
+        query_len = vim.fn.strdisplaywidth(query)
       end
-    end
 
-    winbar_text = prefix .. highlighted .. suffix
+      local highlighted = highlight_sql_winbar(query)
+      local padding = suffix_start_pos - prefix_len - query_len
+      padding = math.max(1, padding)
+      winbar_text = prefix .. highlighted .. string.rep(" ", padding) .. table.concat(suffix_parts, "  ")
+    end
   end
 
   vim.api.nvim_win_set_option(M.result_win, "winbar", indent .. winbar_text)
@@ -712,6 +747,84 @@ local function format_error(raw)
   return lines, highlights
 end
 
+--- Check if result is a mutation (UPDATE/DELETE/INSERT/CREATE/DROP/ALTER/TRUNCATE)
+---@param raw string
+---@return boolean, string|nil verb, number|nil count
+local function parse_mutation_result(raw)
+  local line = vim.trim(raw)
+
+  -- PostgreSQL: UPDATE N, DELETE N, INSERT 0 N
+  local update_count = line:match("^UPDATE%s+(%d+)")
+  if update_count then
+    return true, "UPDATE", tonumber(update_count)
+  end
+
+  local delete_count = line:match("^DELETE%s+(%d+)")
+  if delete_count then
+    return true, "DELETE", tonumber(delete_count)
+  end
+
+  local insert_count = line:match("^INSERT%s+%d+%s+(%d+)")
+  if insert_count then
+    return true, "INSERT", tonumber(insert_count)
+  end
+
+  -- DDL statements
+  if line:match("^CREATE") then
+    return true, "CREATE", nil
+  end
+  if line:match("^DROP") then
+    return true, "DROP", nil
+  end
+  if line:match("^ALTER") then
+    return true, "ALTER", nil
+  end
+  if line:match("^TRUNCATE") then
+    return true, "TRUNCATE", nil
+  end
+
+  return false, nil, nil
+end
+
+--- Format mutation result for pretty display
+---@param verb string
+---@param count number|nil
+---@return string[] lines, table[] highlights
+local function format_mutation_result(verb, count)
+  local lines = {}
+  local highlights = {}
+
+  -- Icons and colors per verb
+  local verb_config = {
+    UPDATE = { icon = "󰏫", hl = "DbabHistoryUpdate", label = "updated" },
+    DELETE = { icon = "󰆴", hl = "DbabHistoryDelete", label = "deleted" },
+    INSERT = { icon = "󰐕", hl = "DbabHistoryInsert", label = "inserted" },
+    CREATE = { icon = "󰙴", hl = "DbabHistoryCreate", label = "created" },
+    DROP = { icon = "󰆴", hl = "DbabHistoryDelete", label = "dropped" },
+    ALTER = { icon = "󰏫", hl = "DbabHistoryAlter", label = "altered" },
+    TRUNCATE = { icon = "󰆴", hl = "DbabHistoryTruncate", label = "truncated" },
+  }
+
+  local cfg = verb_config[verb] or { icon = "✓", hl = "String", label = "completed" }
+
+  table.insert(lines, "")
+
+  -- Main result line
+  local result_line
+  if count then
+    local row_word = count == 1 and "row" or "rows"
+    result_line = string.format(" %s %d %s %s", cfg.icon, count, row_word, cfg.label)
+  else
+    result_line = string.format(" %s %s successful", cfg.icon, verb)
+  end
+  table.insert(lines, result_line)
+  table.insert(highlights, { line = 1, hl = cfg.hl, col_start = 0, col_end = -1 })
+
+  table.insert(lines, "")
+
+  return lines, highlights
+end
+
 --- Save query by buffer number
 ---@param buf number
 ---@param callback? fun(success: boolean)
@@ -866,6 +979,37 @@ function M.show_result(raw, elapsed)
     end
 
     vim.notify("[dbab] Query error", vim.log.levels.ERROR)
+    return
+  end
+
+  -- Mutation 결과인 경우 (UPDATE/DELETE/INSERT 등)
+  local is_mutation, verb, count = parse_mutation_result(raw)
+  if is_mutation and verb then
+    local lines, highlights = format_mutation_result(verb, count)
+
+    vim.api.nvim_buf_set_lines(M.result_buf, 0, -1, false, lines)
+    vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
+
+    -- Mutation 결과시 line number 숨김
+    if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
+      vim.api.nvim_win_set_option(M.result_win, "number", false)
+      vim.api.nvim_win_set_option(M.result_win, "relativenumber", false)
+    end
+
+    -- 하이라이트 적용
+    local ns = vim.api.nvim_create_namespace("dbab_result")
+    vim.api.nvim_buf_clear_namespace(M.result_buf, ns, 0, -1)
+    for _, hl in ipairs(highlights) do
+      vim.api.nvim_buf_add_highlight(M.result_buf, ns, hl.hl, hl.line, hl.col_start, hl.col_end)
+    end
+
+    -- winbar 업데이트
+    M.last_result = { columns = {}, rows = {}, row_count = count or 0, raw = raw }
+    M.refresh_result_winbar()
+
+    local status_msg = count and string.format(" %s: %d rows (%.1fms) ", verb, count, elapsed)
+      or string.format(" %s successful (%.1fms) ", verb, elapsed)
+    vim.notify(status_msg, vim.log.levels.INFO)
     return
   end
 
@@ -1097,6 +1241,18 @@ function M.open()
         local history_ui = require("dbab.ui.history")
         history_ui.render()
         -- Re-render result winbar for padding recalculation
+        M.refresh_result_winbar()
+      end
+    end,
+  })
+
+  -- Split 창 크기 변경 시 winbar 재렌더링 (Neovim 0.9+)
+  vim.api.nvim_create_autocmd("WinResized", {
+    group = augroup,
+    callback = function()
+      if M.tab_nr and vim.api.nvim_get_current_tabpage() == M.tab_nr then
+        local history_ui = require("dbab.ui.history")
+        history_ui.render()
         M.refresh_result_winbar()
       end
     end,

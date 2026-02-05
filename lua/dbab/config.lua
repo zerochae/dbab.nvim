@@ -20,6 +20,7 @@ M.defaults = {
       max_width = 120,
       max_height = 20,
       show_line_number = true,
+      header_align = "fit", -- "fit" = align metadata to grid width, "full" = align to window edge
     },
   },
   keymaps = {

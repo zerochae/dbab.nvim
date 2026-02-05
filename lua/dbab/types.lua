@@ -32,10 +32,13 @@
 ---@field position "left"|"right" History panel position
 ---@field width number Width as percentage (0.1~1.0)
 
+---@alias Dbab.HeaderAlign "fit"|"full"
+
 ---@class Dbab.GridConfig
 ---@field max_width number Maximum grid width
 ---@field max_height number Maximum grid height
 ---@field show_line_number boolean Show line numbers in result grid
+---@field header_align Dbab.HeaderAlign Winbar metadata alignment ("fit" = align to grid, "full" = align to window edge)
 
 ---@class Dbab.SchemaConfig
 ---@field show_system_schemas boolean Show system schemas (pg_catalog, information_schema)
