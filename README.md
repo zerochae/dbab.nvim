@@ -2,6 +2,8 @@
 
 A lightweight database client for Neovim. Query databases directly from your editor.
 
+![dbab.nvim](./screenshots/main.png)
+
 ## Features
 
 - **Multi-database support**: PostgreSQL, MySQL, SQLite
@@ -16,6 +18,9 @@ A lightweight database client for Neovim. Query databases directly from your edi
 ## Layout
 
 ### Classic (default)
+
+![Classic Layout](./screenshots/layout-classic.png)
+
 ```
 ┌─────────────────────┬─────────────────────────────────────┐
 │ Sidebar (20%)       │ Query Editor (80%)                  │
@@ -25,6 +30,9 @@ A lightweight database client for Neovim. Query databases directly from your edi
 ```
 
 ### Wide
+
+![Wide Layout](./screenshots/layout-wide.png)
+
 ```
 ┌─────────────────────┬─────────────────────┬───────────────┐
 │ Sidebar (33%)       │ Query Editor (34%)  │ History (33%) │
@@ -114,6 +122,17 @@ A lightweight database client for Neovim. Query databases directly from your edi
 | `<Tab>` | Move to sidebar |
 | `<S-Tab>` | Move to editor |
 | `q` | Close |
+
+## Screenshots
+
+### Schema Browser
+![Schema Browser](./screenshots/sidebar.png)
+
+### Query Result with Type Highlighting
+![Result Viewer](./screenshots/result.png)
+
+### Query History
+![Query History](./screenshots/history.png)
 
 ## Configuration
 
