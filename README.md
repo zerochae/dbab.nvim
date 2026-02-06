@@ -6,7 +6,7 @@ A lightweight database client for Neovim. Query databases directly from your edi
 
 ## Features
 
-- **Multi-database support**: PostgreSQL, MySQL, SQLite
+- **Multi-database support**: PostgreSQL, MySQL, MariaDB, SQLite
 - **Flexible layout**: Choose from presets or define your own pane arrangement
 - **Schema browser**: Navigate schemas, tables, and columns in sidebar
 - **Query editor**: Write and execute SQL with syntax highlighting
@@ -208,6 +208,7 @@ Components: `"sidebar"`, `"editor"`, `"history"`, `"grid"` (editor and grid are 
 ```
 postgres://user:password@host:port/database
 mysql://user:password@host:port/database
+mariadb://user:password@host:port/database
 sqlite:///path/to/database.db
 ```
 
