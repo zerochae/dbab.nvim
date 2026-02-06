@@ -65,8 +65,21 @@ function M.execute_async(url, query, callback)
   -- Get command from dadbod
   local ok, cmd = pcall(vim.fn["db#adapter#dispatch"], url, "interactive")
   
-  -- Fallback for mariadb scheme if mariadb command is missing
-  -- but mysql command is available
+  -- Fallback logic for mariadb:
+  -- If dadbod returns 'mariadb' command but it's not executable,
+  -- switch to 'mysql' if available.
+  if ok and cmd and url:match("^mariadb://") then
+    local is_mariadb = false
+    if type(cmd) == "string" and cmd:match("^mariadb") then is_mariadb = true end
+    if type(cmd) == "table" and cmd[1] == "mariadb" then is_mariadb = true end
+    
+    if is_mariadb and vim.fn.executable("mariadb") == 0 and vim.fn.executable("mysql") == 1 then
+       local fallback_url = url:gsub("^mariadb://", "mysql://")
+       ok, cmd = pcall(vim.fn["db#adapter#dispatch"], fallback_url, "interactive")
+    end
+  end
+
+  -- Fallback for when dadbod completely fails on mariadb (e.g. adapter not found)
   if (not ok or not cmd) and url:match("^mariadb://") then
      if vim.fn.executable("mariadb") == 0 and vim.fn.executable("mysql") == 1 then
         local fallback_url = url:gsub("^mariadb://", "mysql://")
