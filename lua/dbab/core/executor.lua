@@ -11,7 +11,21 @@ local has_plenary, Job = pcall(require, "plenary.job")
 function M.execute(url, query)
   local ok, result = pcall(function()
     -- db#adapter#dispatch를 사용하여 쿼리 실행
-    local cmd = vim.fn["db#adapter#dispatch"](url, "interactive")
+    local cmd_val = vim.fn["db#adapter#dispatch"](url, "interactive")
+    
+    -- Fallback for mariadb: if missing, try mysql
+    if url:match("^mariadb://") then
+      local is_mariadb = false
+      if type(cmd_val) == "string" and cmd_val:match("^mariadb") then is_mariadb = true end
+      if type(cmd_val) == "table" and cmd_val[1] == "mariadb" then is_mariadb = true end
+      
+      if is_mariadb and vim.fn.executable("mariadb") == 0 and vim.fn.executable("mysql") == 1 then
+         local fallback_url = url:gsub("^mariadb://", "mysql://")
+         cmd_val = vim.fn["db#adapter#dispatch"](fallback_url, "interactive")
+      end
+    end
+
+    local cmd = cmd_val
     local lines = vim.fn["db#systemlist"](cmd, query)
     return table.concat(lines, "\n")
   end)
@@ -50,6 +64,16 @@ function M.execute_async(url, query, callback)
 
   -- Get command from dadbod
   local ok, cmd = pcall(vim.fn["db#adapter#dispatch"], url, "interactive")
+  
+  -- Fallback for mariadb scheme if mariadb command is missing
+  -- but mysql command is available
+  if (not ok or not cmd) and url:match("^mariadb://") then
+     if vim.fn.executable("mariadb") == 0 and vim.fn.executable("mysql") == 1 then
+        local fallback_url = url:gsub("^mariadb://", "mysql://")
+        ok, cmd = pcall(vim.fn["db#adapter#dispatch"], fallback_url, "interactive")
+     end
+  end
+
   if not ok or not cmd then
     vim.schedule(function()
       callback("", "Failed to get adapter command")
