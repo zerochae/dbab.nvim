@@ -13,7 +13,7 @@ M.active_name = nil
 function M.parse_type(url)
   if url:match("^postgres") or url:match("^postgresql") then
     return "postgres"
-  elseif url:match("^mysql") then
+  elseif url:match("^mysql") or url:match("^mariadb") then
     return "mysql"
   elseif url:match("^sqlite") then
     return "sqlite"

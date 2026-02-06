@@ -29,6 +29,10 @@ describe("connection", function()
       assert.are.equal("mysql", connection.parse_type("mysql://localhost/db"))
     end)
 
+    it("detects mariadb as mysql", function()
+      assert.are.equal("mysql", connection.parse_type("mariadb://localhost/db"))
+    end)
+
     it("detects sqlite", function()
       assert.are.equal("sqlite", connection.parse_type("sqlite:///path/to/db"))
     end)
