@@ -6,6 +6,12 @@ local M = {}
 ---@return Dbab.QueryResult
 function M.parse(raw)
   local lines = vim.split(raw, "\n")
+
+  -- Filter out MySQL warnings
+  lines = vim.tbl_filter(function(line)
+    return not line:match("^mysql: %[Warning%]")
+  end, lines)
+
   local result = {
     columns = {},
     rows = {},

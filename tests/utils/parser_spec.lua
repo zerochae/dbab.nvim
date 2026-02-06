@@ -96,18 +96,19 @@ line3]]
       assert.are.equal(3, #result.rows)
     end)
 
-    it("parses wide columns correctly", function()
-      local raw = [[
- id | description
-----+----------------------------------------
-  1 | This is a very long description text
+    it("ignores mysql password warning", function()
+      local raw = [[mysql: [Warning] Using a password on the command line interface can be insecure.
+ id | name
+----+------
+  1 | test
 (1 row)]]
 
       local result = parser.parse(raw)
 
       assert.are.equal(2, #result.columns)
+      assert.are.equal("id", result.columns[1])
       assert.are.equal(1, #result.rows)
-      assert.is_true(result.rows[1][2]:match("This is a very long") ~= nil)
+      assert.are.equal("test", result.rows[1][2])
     end)
   end)
 
