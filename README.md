@@ -57,7 +57,10 @@ A lightweight database client for Neovim. Query databases directly from your edi
 ```lua
 {
   "zerochae/dbab.nvim",
-  dependencies = { "MunifTanjim/nui.nvim" },
+  dependencies = {
+    "MunifTanjim/nui.nvim",
+    "hrsh7th/nvim-cmp", -- Optional: for autocompletion
+  },
   config = function()
     require("dbab").setup({
       connections = {
@@ -67,6 +70,19 @@ A lightweight database client for Neovim. Query databases directly from your edi
     })
   end,
 }
+```
+
+## Autocompletion (Optional)
+
+If you use `nvim-cmp`, add `dbab` to your sources to enable SQL autocompletion (tables, columns, keywords):
+
+```lua
+require("cmp").setup({
+  sources = {
+    { name = "dbab" },
+    -- other sources...
+  },
+})
 ```
 
 ## Usage

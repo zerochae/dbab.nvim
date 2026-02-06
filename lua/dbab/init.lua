@@ -10,8 +10,8 @@ function M.setup(opts)
   M.ui.highlights.setup()
 
   -- Register CMP source if nvim-cmp is available
-  local ok, cmp = pcall(require, "cmp")
-  if ok then
+  local has_cmp, cmp = pcall(require, "cmp")
+  if has_cmp then
     cmp.register_source("dbab", require("cmp_dbab").new())
   end
 end

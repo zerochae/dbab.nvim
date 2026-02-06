@@ -48,6 +48,7 @@ REQUIREMENTS                                                *dbab-requirements*
 
 - Neovim >= 0.9.0
 - nui.nvim (https://github.com/MunifTanjim/nui.nvim)
+- nvim-cmp (optional, for autocompletion)
 - Database CLI tools:
   - `psql` for PostgreSQL
   - `mysql` for MySQL
@@ -68,6 +69,18 @@ Using lazy.nvim: >lua
         })
       end,
     }
+<
+
+AUTOCOMPLETION                                             *dbab-autocompletion*
+
+If you use nvim-cmp, add `dbab` to your sources to enable SQL autocompletion: >lua
+
+    require("cmp").setup({
+      sources = {
+        { name = "dbab" },
+        -- other sources...
+      },
+    })
 <
 
 ==============================================================================
