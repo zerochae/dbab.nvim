@@ -21,6 +21,20 @@ describe("config", function()
       assert.is_not_nil(config.defaults.keymaps.open)
       assert.is_not_nil(config.defaults.keymaps.execute)
       assert.is_not_nil(config.defaults.keymaps.close)
+
+      -- Verify new comprehensive keymaps
+      assert.is_not_nil(config.defaults.keymaps.sidebar)
+      assert.is_not_nil(config.defaults.keymaps.sidebar.toggle_expand)
+      assert.is_not_nil(config.defaults.keymaps.sidebar.refresh)
+
+      assert.is_not_nil(config.defaults.keymaps.history)
+      assert.is_not_nil(config.defaults.keymaps.history.select)
+
+      assert.is_not_nil(config.defaults.keymaps.editor)
+      assert.is_not_nil(config.defaults.keymaps.editor.save)
+
+      assert.is_not_nil(config.defaults.keymaps.result)
+      assert.is_not_nil(config.defaults.keymaps.result.yank_row)
     end)
 
     it("has schema configuration", function()

@@ -55,7 +55,50 @@
 
 ---@class Dbab.Keymaps
 ---@field open string Keymap to open dbab
----@field execute string Keymap to execute query
+---@field execute string Keymap to execute query (Global)
+---@field close string Keymap to close dbab (Global)
+---@field sidebar Dbab.SidebarKeymaps
+---@field history Dbab.HistoryKeymaps
+---@field editor Dbab.EditorKeymaps
+---@field result Dbab.ResultKeymaps
+
+---@class Dbab.SidebarKeymaps
+---@field toggle_expand string|string[] Toggle expand/collapse or open query
+---@field refresh string Refresh sidebar
+---@field rename string Rename saved query
+---@field new_query string Create new query
+---@field copy_name string Copy node name
+---@field insert_template string Insert table query template
+---@field delete string Delete saved query
+---@field copy_query string Copy saved query content
+---@field paste_query string Paste saved query
+---@field to_editor string Move focus to editor
+---@field to_history string Move focus to history
+
+---@class Dbab.HistoryKeymaps
+---@field select string Select entry (load or execute)
+---@field execute string Re-execute query
+---@field copy string Copy query text
+---@field delete string Delete entry
+---@field clear string Clear all history
+---@field to_sidebar string Move focus to sidebar
+---@field to_result string Move focus to result
+
+---@class Dbab.EditorKeymaps
+---@field execute_insert string Execute query in insert mode
+---@field execute_leader string Execute query with leader
+---@field save string Save current query
+---@field next_tab string Next query tab
+---@field prev_tab string Previous query tab
+---@field close_tab string Close current tab
+---@field to_result string Move focus to result
+---@field to_sidebar string Move focus to sidebar
+
+---@class Dbab.ResultKeymaps
+---@field yank_row string Yank current row as JSON
+---@field yank_all string Yank all rows as JSON
+---@field to_sidebar string Move focus to sidebar
+---@field to_editor string Move focus to editor
 
 -- Aliases for backward compatibility
 ---@alias DbabConfig Dbab.Config

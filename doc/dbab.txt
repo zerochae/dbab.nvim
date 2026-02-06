@@ -113,9 +113,48 @@ keymaps ~
     Global keymap configuration.
     Type: `Dbab.Keymaps`
 
+    Global:
     - `open`: Keymap to open dbab (default: "<Leader>db")
     - `execute`: Keymap to execute query (default: "<CR>")
-    - `close`: Keymap to close (default: "<Esc>")
+    - `close`: Keymap to close dbab (default: "q")
+
+    Sidebar:
+    - `sidebar.toggle_expand`: Toggle expand/collapse or open (default: {"<CR>", "o"})
+    - `sidebar.refresh`: Refresh sidebar (default: "R")
+    - `sidebar.rename`: Rename saved query (default: "r")
+    - `sidebar.new_query`: Create new query (default: "n")
+    - `sidebar.copy_name`: Copy node name (default: "y")
+    - `sidebar.insert_template`: Insert table query template (default: "i")
+    - `sidebar.delete`: Delete saved query (default: "d")
+    - `sidebar.copy_query`: Copy saved query content (default: "c")
+    - `sidebar.paste_query`: Paste saved query (default: "p")
+    - `sidebar.to_editor`: Move focus to editor (default: "<Tab>")
+    - `sidebar.to_history`: Move focus to history (default: "<S-Tab>")
+
+    History:
+    - `history.select`: Select entry (load/exec) (default: "<CR>")
+    - `history.execute`: Re-execute query (default: "R")
+    - `history.copy`: Copy query text (default: "y")
+    - `history.delete`: Delete entry (default: "d")
+    - `history.clear`: Clear all history (default: "C")
+    - `history.to_sidebar`: Move focus to sidebar (default: "<Tab>")
+    - `history.to_result`: Move focus to result (default: "<S-Tab>")
+
+    Editor:
+    - `editor.execute_insert`: Execute in insert mode (default: "<C-CR>")
+    - `editor.execute_leader`: Execute with leader (default: "<Leader>r")
+    - `editor.save`: Save query (default: "<C-s>")
+    - `editor.next_tab`: Next query tab (default: "gt")
+    - `editor.prev_tab`: Previous query tab (default: "gT")
+    - `editor.close_tab`: Close current tab (default: "<Leader>w")
+    - `editor.to_result`: Move focus to result (default: "<Tab>")
+    - `editor.to_sidebar`: Move focus to sidebar (default: "<S-Tab>")
+
+    Result:
+    - `result.yank_row`: Yank current row (default: "y")
+    - `result.yank_all`: Yank all rows (default: "Y")
+    - `result.to_sidebar`: Move focus to sidebar (default: "<Tab>")
+    - `result.to_editor`: Move focus to editor (default: "<S-Tab>")
 
                                                             *dbab-config-schema*
 schema ~

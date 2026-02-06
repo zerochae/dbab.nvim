@@ -2,6 +2,7 @@ local connection = require("dbab.core.connection")
 local schema = require("dbab.core.schema")
 local storage = require("dbab.core.storage")
 local workbench = require("dbab.ui.workbench")
+local config = require("dbab.config")
 
 local M = {}
 
@@ -689,23 +690,31 @@ function M.setup_keymaps()
   end
 
   local opts = { noremap = true, silent = true, buffer = M.buf }
+  local keymaps = config.get().keymaps.sidebar
+
+  -- Helper for multiple keys
+  local function map(keys, func)
+    if type(keys) == "table" then
+      for _, key in ipairs(keys) do
+        vim.keymap.set("n", key, func, opts)
+      end
+    else
+      vim.keymap.set("n", keys, func, opts)
+    end
+  end
 
   -- Toggle expand/collapse
-  vim.keymap.set("n", "<CR>", function()
+  map(keymaps.toggle_expand, function()
     M.toggle_node()
-  end, opts)
-
-  vim.keymap.set("n", "o", function()
-    M.toggle_node()
-  end, opts)
+  end)
 
   -- Refresh
-  vim.keymap.set("n", "R", function()
+  map(keymaps.refresh, function()
     M.refresh()
-  end, opts)
+  end)
 
   -- Rename saved query
-  vim.keymap.set("n", "r", function()
+  map(keymaps.rename, function()
     local cursor = vim.api.nvim_win_get_cursor(M.win)
     local node_idx = cursor[1]
     if node_idx >= 1 and node_idx <= #M.nodes then
@@ -734,20 +743,20 @@ function M.setup_keymaps()
         end)
       end
     end
-  end, opts)
+  end)
 
   -- New query
-  vim.keymap.set("n", "n", function()
+  map(keymaps.new_query, function()
     local conn_name = connection.get_active_name()
     if conn_name then
       M.open_new_query(conn_name)
     else
       vim.notify("[dbab] No active connection", vim.log.levels.WARN)
     end
-  end, opts)
+  end)
 
   -- Copy name
-  vim.keymap.set("n", "y", function()
+  map(keymaps.copy_name, function()
     local cursor = vim.api.nvim_win_get_cursor(M.win)
     local node_idx = cursor[1]
     if node_idx >= 1 and node_idx <= #M.nodes then
@@ -758,18 +767,18 @@ function M.setup_keymaps()
         vim.notify("[dbab] Copied: " .. node.name, vim.log.levels.INFO)
       end
     end
-  end, opts)
+  end)
 
   -- Insert table query
-  vim.keymap.set("n", "i", function()
+  map(keymaps.insert_template, function()
     local query = M.insert_table_query()
     if query then
       workbench.open_editor_with_query(query)
     end
-  end, opts)
+  end)
 
   -- Delete saved query
-  vim.keymap.set("n", "d", function()
+  map(keymaps.delete, function()
     local cursor = vim.api.nvim_win_get_cursor(M.win)
     local node_idx = cursor[1]
     if node_idx >= 1 and node_idx <= #M.nodes then
@@ -779,15 +788,21 @@ function M.setup_keymaps()
           prompt = "Delete query '" .. node.name .. "'?",
         }, function(choice)
           if choice == "Yes" then
-            M.delete_saved_query(node.parent, node.name)
+            storage.delete_query(node.parent, node.name)
+            M.refresh()
           end
         end)
       end
     end
+  end)
+
+  -- Close
+  vim.keymap.set("n", config.get().keymaps.close, function()
+    M.close()
   end, opts)
 
-  -- Copy saved query (c)
-  vim.keymap.set("n", "c", function()
+  -- Copy saved query
+  map(keymaps.copy_query, function()
     local cursor = vim.api.nvim_win_get_cursor(M.win)
     local node_idx = cursor[1]
     if node_idx >= 1 and node_idx <= #M.nodes then
@@ -804,10 +819,10 @@ function M.setup_keymaps()
         end
       end
     end
-  end, opts)
+  end)
 
-  -- Paste saved query (p)
-  vim.keymap.set("n", "p", function()
+  -- Paste saved query
+  map(keymaps.paste_query, function()
     if not M.clipboard then
       vim.notify("[dbab] Nothing to paste", vim.log.levels.WARN)
       return
@@ -843,26 +858,21 @@ function M.setup_keymaps()
         end
       end
     end)
-  end, opts)
+  end)
 
-  -- Tab: Editor로 이동
-  vim.keymap.set("n", "<Tab>", function()
+  -- Tab: To Editor
+  map(keymaps.to_editor, function()
     if workbench.editor_win and vim.api.nvim_win_is_valid(workbench.editor_win) then
       vim.api.nvim_set_current_win(workbench.editor_win)
     end
-  end, opts)
+  end)
 
-  -- S-Tab: History로 이동 (v6 layout)
-  vim.keymap.set("n", "<S-Tab>", function()
+  -- S-Tab: To History
+  map(keymaps.to_history, function()
     if workbench.history_win and vim.api.nvim_win_is_valid(workbench.history_win) then
       vim.api.nvim_set_current_win(workbench.history_win)
     end
-  end, opts)
-
-  -- q: dbab 닫기
-  vim.keymap.set("n", "q", function()
-    workbench.close()
-  end, opts)
+  end)
 end
 
 function M.cleanup()

@@ -565,19 +565,20 @@ end
 ---@param buf number
 function M.setup_keymaps(buf)
   local opts = { buffer = buf, noremap = true, silent = true }
+  local keymaps = config.get().keymaps.history
 
-  -- Enter: load or execute based on config
-  vim.keymap.set("n", "<CR>", function()
+  -- Enter: load or execute
+  vim.keymap.set("n", keymaps.select, function()
     M.on_select()
   end, opts)
 
-  -- R: re-run immediately
-  vim.keymap.set("n", "R", function()
+  -- Re-execute
+  vim.keymap.set("n", keymaps.execute, function()
     M.execute_entry()
   end, opts)
 
-  -- y: copy query
-  vim.keymap.set("n", "y", function()
+  -- Copy query
+  vim.keymap.set("n", keymaps.copy, function()
     local entry = M.get_entry_at_cursor()
     if entry then
       vim.fn.setreg("+", entry.query)
@@ -586,8 +587,8 @@ function M.setup_keymaps(buf)
     end
   end, opts)
 
-  -- d: delete entry
-  vim.keymap.set("n", "d", function()
+  -- Delete entry
+  vim.keymap.set("n", keymaps.delete, function()
     local entry, idx = M.get_entry_at_cursor()
     if entry and idx then
       vim.ui.select({ "Yes", "No" }, {
@@ -601,8 +602,8 @@ function M.setup_keymaps(buf)
     end
   end, opts)
 
-  -- C: clear all history
-  vim.keymap.set("n", "C", function()
+  -- Clear history
+  vim.keymap.set("n", keymaps.clear, function()
     vim.ui.select({ "Yes", "No" }, {
       prompt = "Clear all history?",
     }, function(choice)
@@ -614,22 +615,22 @@ function M.setup_keymaps(buf)
     end)
   end, opts)
 
-  -- q: close dbab
-  vim.keymap.set("n", "q", function()
+  -- Close
+  vim.keymap.set("n", config.get().keymaps.close, function()
     local workbench = require("dbab.ui.workbench")
     workbench.close()
   end, opts)
 
-  -- Tab: Sidebar로 이동 (History → Sidebar)
-  vim.keymap.set("n", "<Tab>", function()
+  -- Tab: To Sidebar
+  vim.keymap.set("n", keymaps.to_sidebar, function()
     local workbench = require("dbab.ui.workbench")
     if workbench.sidebar_win and vim.api.nvim_win_is_valid(workbench.sidebar_win) then
       vim.api.nvim_set_current_win(workbench.sidebar_win)
     end
   end, opts)
 
-  -- S-Tab: Result로 이동 (History → Result)
-  vim.keymap.set("n", "<S-Tab>", function()
+  -- S-Tab: To Result
+  vim.keymap.set("n", keymaps.to_result, function()
     local workbench = require("dbab.ui.workbench")
     if workbench.result_win and vim.api.nvim_win_is_valid(workbench.result_win) then
       vim.api.nvim_set_current_win(workbench.result_win)

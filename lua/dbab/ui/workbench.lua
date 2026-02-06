@@ -1471,9 +1471,10 @@ function M.setup_result_keymaps()
   end
 
   local result_opts = { noremap = true, silent = true, buffer = M.result_buf }
+  local keymaps = config.get().keymaps.result
 
-  -- Tab: History로 이동 (v6: Result → History)
-  vim.keymap.set("n", "<Tab>", function()
+  -- Tab: To Sidebar/History
+  vim.keymap.set("n", keymaps.to_sidebar, function()
     if M.history_win and vim.api.nvim_win_is_valid(M.history_win) then
       vim.api.nvim_set_current_win(M.history_win)
     elseif M.sidebar_win and vim.api.nvim_win_is_valid(M.sidebar_win) then
@@ -1481,25 +1482,25 @@ function M.setup_result_keymaps()
     end
   end, result_opts)
 
-  -- S-Tab: Editor로 이동
-  vim.keymap.set("n", "<S-Tab>", function()
+  -- S-Tab: To Editor
+  vim.keymap.set("n", keymaps.to_editor, function()
     if M.editor_win and vim.api.nvim_win_is_valid(M.editor_win) then
       vim.api.nvim_set_current_win(M.editor_win)
     end
   end, result_opts)
 
-  -- y: 현재 행 yank (JSON)
-  vim.keymap.set("n", "y", function()
+  -- y: Yank current row
+  vim.keymap.set("n", keymaps.yank_row, function()
     M.yank_current_row()
   end, result_opts)
 
-  -- Y: 전체 yank (JSON)
-  vim.keymap.set("n", "Y", function()
+  -- Y: Yank all rows
+  vim.keymap.set("n", keymaps.yank_all, function()
     M.yank_all_rows()
   end, result_opts)
 
-  -- q: 닫기
-  vim.keymap.set("n", "q", function()
+  -- Close
+  vim.keymap.set("n", config.get().keymaps.close, function()
     M.close()
   end, result_opts)
 end
@@ -1512,49 +1513,50 @@ function M.setup_editor_keymaps(buf)
   end
 
   local opts = { noremap = true, silent = true, buffer = buf }
+  local keymaps = config.get().keymaps.editor
 
-  -- Enter: 쿼리 실행 (Normal mode)
-  vim.keymap.set("n", "<CR>", function()
+  -- Enter: Execute query (Normal mode)
+  vim.keymap.set("n", config.get().keymaps.execute, function()
     M.execute_query()
   end, opts)
 
-  -- Ctrl+Enter: 쿼리 실행 (Insert mode에서도)
-  vim.keymap.set("i", "<C-CR>", function()
+  -- Ctrl+Enter: Execute query (Insert mode)
+  vim.keymap.set("i", keymaps.execute_insert, function()
     M.execute_query()
   end, opts)
 
-  -- Leader+r: 쿼리 실행
-  vim.keymap.set("n", "<Leader>r", function()
+  -- Leader+r: Execute query
+  vim.keymap.set("n", keymaps.execute_leader, function()
     M.execute_query()
   end, opts)
 
-  -- Ctrl+s: 저장
-  vim.keymap.set("n", "<C-s>", function()
+  -- Ctrl+s: Save
+  vim.keymap.set("n", keymaps.save, function()
     M.save_current_query()
   end, opts)
 
-  vim.keymap.set("i", "<C-s>", function()
+  vim.keymap.set("i", keymaps.save, function()
     vim.cmd("stopinsert")
     M.save_current_query()
   end, opts)
 
-  -- gt: 다음 탭
-  vim.keymap.set("n", "gt", function()
+  -- gt: Next tab
+  vim.keymap.set("n", keymaps.next_tab, function()
     M.next_tab()
   end, opts)
 
-  -- gT: 이전 탭
-  vim.keymap.set("n", "gT", function()
+  -- gT: Previous tab
+  vim.keymap.set("n", keymaps.prev_tab, function()
     M.prev_tab()
   end, opts)
 
-  -- Leader+w: 탭 닫기 (C-w는 vim 윈도우 관리와 충돌)
-  vim.keymap.set("n", "<Leader>w", function()
+  -- Leader+w: Close tab
+  vim.keymap.set("n", keymaps.close_tab, function()
     M.close_tab()
   end, opts)
 
-  -- Tab: Result로 이동 (Editor -> Result)
-  vim.keymap.set("n", "<Tab>", function()
+  -- Tab: To Result
+  vim.keymap.set("n", keymaps.to_result, function()
     if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
       vim.api.nvim_set_current_win(M.result_win)
     elseif M.sidebar_win and vim.api.nvim_win_is_valid(M.sidebar_win) then
@@ -1562,15 +1564,15 @@ function M.setup_editor_keymaps(buf)
     end
   end, opts)
 
-  -- S-Tab: Sidebar로 이동 (Editor -> Sidebar)
-  vim.keymap.set("n", "<S-Tab>", function()
+  -- S-Tab: To Sidebar
+  vim.keymap.set("n", keymaps.to_sidebar, function()
     if M.sidebar_win and vim.api.nvim_win_is_valid(M.sidebar_win) then
       vim.api.nvim_set_current_win(M.sidebar_win)
     end
   end, opts)
 
-  -- q: 닫기
-  vim.keymap.set("n", "q", function()
+  -- Close
+  vim.keymap.set("n", config.get().keymaps.close, function()
     M.close()
   end, opts)
 end

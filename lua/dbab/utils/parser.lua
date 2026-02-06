@@ -20,6 +20,8 @@ function M.parse(raw)
   }
 
   if #lines == 0 then
+    -- Return single empty column for empty result
+    result.columns = { "result" }
     return result
   end
 
@@ -49,8 +51,8 @@ function M.parse(raw)
 
   -- 구분선으로 컬럼 위치 파악
   if not separator_line:match("^%-") and not separator_line:match("^%+") then
-    -- 구분선이 없으면 raw 텍스트 그대로 반환 (헤더 없이)
-    result.columns = {}
+    -- 구분선이 없으면 raw 텍스트 그대로 반환 (단일 컬럼)
+    result.columns = { "result" }
     for _, line in ipairs(lines) do
       if line ~= "" then
         table.insert(result.rows, { line })
