@@ -269,6 +269,15 @@ sqlite:///path/to/database.db
 
 Environment variables are supported: `$DATABASE_URL` or `${DATABASE_URL}`
 
+## Acknowledgements
+
+This project was inspired by excellent existing plugins:
+
+- [vim-dadbod-ui](https://github.com/kristijanhusak/vim-dadbod-ui): The classic DB UI for Vim/Neovim.
+- [nvim-dbee](https://github.com/kndndrj/nvim-dbee): A modern approach to DB client in Neovim.
+
+`dbab.nvim` aims to provide a lightweight alternative with a modern Lua-based UI while leveraging the robust backend of [vim-dadbod](https://github.com/tpope/vim-dadbod).
+
 ## License
 
 MIT
