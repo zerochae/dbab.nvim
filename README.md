@@ -166,7 +166,10 @@ require("dbab").setup({
     --   { "history", "grid" },
     -- },
     sidebar = { width = 0.2 },
-    history = { width = 0.2 },
+    history = {
+      width = 0.2,
+      style = "compact", -- "compact" or "detailed"
+    },
     grid = {
       max_width = 120,
       max_height = 20,
@@ -299,6 +302,140 @@ ui = {
 #### markdown
 
 ![style-markdown](./screenshots/style-markdown.png)
+
+### History Styles
+
+Configure with `ui.history.style`:
+
+| Style | Description |
+|-------|-------------|
+| `"compact"` | One line per entry with verb, target, hints (default) |
+| `"detailed"` | Multi-line: full query with syntax highlighting + metadata below |
+
+```lua
+ui = {
+  history = {
+    style = "detailed",
+  },
+}
+```
+
+## Highlight Groups
+
+All highlight groups can be overridden by defining them before `setup()`.
+Groups marked with **(computed)** are always recalculated based on your colorscheme.
+
+### Grid
+
+| Group | Default | Description |
+|-------|---------|-------------|
+| `DbabRowOdd` | **(computed)** | Odd row background |
+| `DbabRowEven` | **(computed)** | Even row background |
+| `DbabHeader` | **(computed)** | Grid header (from `Function` fg) |
+| `DbabSeparator` | `Comment` | Grid separator lines |
+| `DbabCellActive` | `CursorLine` | Active cell |
+
+### Window
+
+| Group | Default | Description |
+|-------|---------|-------------|
+| `DbabFloat` | `NormalFloat` | Float window background |
+| `DbabBorder` | `WinSeparator` | Window border |
+| `DbabTitle` | `Title` | Window title |
+
+### Data Types
+
+| Group | Default | Description |
+|-------|---------|-------------|
+| `DbabNull` | `Comment` | NULL values |
+| `DbabNumber` | `Number` | Numeric values |
+| `DbabString` | `Normal` | String values |
+| `DbabBoolean` | `Boolean` | Boolean values |
+| `DbabDateTime` | `Special` | Date/time values |
+| `DbabUuid` | `Constant` | UUID values |
+| `DbabJson` | `Function` | JSON values |
+
+### Schema
+
+| Group | Default | Description |
+|-------|---------|-------------|
+| `DbabTable` | `Type` | Table names |
+| `DbabKey` | `Keyword` | Key names |
+| `DbabPK` | `DiagnosticError` | Primary key (bold) |
+| `DbabFK` | `Function` | Foreign key (bold) |
+
+### Sidebar
+
+| Group | Default | Description |
+|-------|---------|-------------|
+| `DbabSidebarIconConnection` | `Number` | Connection icon |
+| `DbabSidebarIconActive` | `String` | Active connection icon |
+| `DbabSidebarIconNewQuery` | `Function` | New query icon |
+| `DbabSidebarIconBuffers` | `Function` | Buffers icon |
+| `DbabSidebarIconSaved` | `Keyword` | Saved queries icon |
+| `DbabSidebarIconSchemas` | `Special` | Schemas icon |
+| `DbabSidebarIconSchema` | `Type` | Schema icon |
+| `DbabSidebarIconTable` | `Type` | Table icon |
+| `DbabSidebarIconColumn` | `Function` | Column icon |
+| `DbabSidebarIconPK` | `DiagnosticError` | Primary key icon |
+| `DbabSidebarText` | `Normal` | Default text |
+| `DbabSidebarTextActive` | `String` | Active item text (bold) |
+| `DbabSidebarType` | `Comment` | Type annotation |
+
+### History
+
+| Group | Default | Description |
+|-------|---------|-------------|
+| `DbabHistoryHeader` | `Title` | Section header (bold) |
+| `DbabHistoryRowOdd` | **(computed)** | Odd row background |
+| `DbabHistoryRowEven` | **(computed)** | Even row background |
+| `DbabHistoryTime` | `Comment` | Timestamp |
+| `DbabHistoryVerb` | `Keyword` | SQL verb |
+| `DbabHistoryTarget` | `Type` | Target table name |
+| `DbabHistoryDuration` | `Number` | Execution duration |
+| `DbabHistoryConnName` | `Normal` | Connection name |
+| `DbabHistorySelect` | `Function` | SELECT queries |
+| `DbabHistoryInsert` | `String` | INSERT queries |
+| `DbabHistoryUpdate` | `Type` | UPDATE queries |
+| `DbabHistoryDelete` | `DiagnosticError` | DELETE queries |
+| `DbabHistoryCreate` | `String` | CREATE statements |
+| `DbabHistoryDrop` | `DiagnosticError` | DROP statements |
+| `DbabHistoryAlter` | `Special` | ALTER statements |
+| `DbabHistoryTruncate` | `DiagnosticWarn` | TRUNCATE statements |
+
+Hint badges (compact mode):
+
+| Group | Default | Description |
+|-------|---------|-------------|
+| `DbabHistoryHintWhere` | `DiagnosticWarn` | WHERE clause |
+| `DbabHistoryHintJoin` | `Special` | JOIN clause |
+| `DbabHistoryHintOrder` | `Keyword` | ORDER BY |
+| `DbabHistoryHintGroup` | `Type` | GROUP BY |
+| `DbabHistoryHintLimit` | `Number` | LIMIT |
+
+### Tab Bar
+
+| Group | Default | Description |
+|-------|---------|-------------|
+| `DbabTabActive` | `bg=#3a3a4a` | Active tab (bold) |
+| `DbabTabActiveIcon` | `bg=#3a3a4a fg=#a6e3a1` | Active tab icon |
+| `DbabTabInactive` | `Comment` | Inactive tab |
+| `DbabTabInactiveIcon` | `Comment` | Inactive tab icon |
+| `DbabTabModified` | `DiagnosticWarn` | Modified indicator |
+| `DbabTabIconSaved` | `String` | Saved query icon |
+| `DbabTabIconUnsaved` | `Function` | Unsaved query icon |
+| `DbabTabbarBg` | `Normal` | Tab bar background |
+
+### Customization
+
+Override highlights before calling `setup()`:
+
+```lua
+vim.api.nvim_set_hl(0, "DbabHeader", { bg = "#ff6600", fg = "#000000" })
+vim.api.nvim_set_hl(0, "DbabNull", { fg = "#555555", italic = true })
+
+require("dbab").setup({ ... })
+```
 
 ## Connection URL Format
 

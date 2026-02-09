@@ -9,7 +9,8 @@ CONTENTS                                                        *dbab-contents*
     4. Configuration ........................... |dbab-configuration|
     5. Commands ................................ |dbab-commands|
     6. Keymaps ................................. |dbab-keymaps|
-    7. Types ................................... |dbab-types|
+    7. Highlights .............................. |dbab-highlights|
+    8. Types ................................... |dbab-types|
 
 ==============================================================================
 INTRODUCTION                                                *dbab-introduction*
@@ -114,6 +115,9 @@ ui ~
 
     ui.history ~
         - `width`: History width ratio 0.1~1.0 (default: 0.2)
+        - `style`: History display style (default: "compact")
+            - `"compact"`: One line per entry
+            - `"detailed"`: Multi-line with full query and metadata
 
     ui.grid ~
         - `max_width`: Maximum grid width (default: 120)
@@ -291,6 +295,113 @@ RESULT KEYMAPS                                            *dbab-keymaps-result*
     `<Tab>`             Move focus to sidebar
     `<S-Tab>`           Move focus to editor
     `q`                 Close dbab
+
+==============================================================================
+HIGHLIGHTS                                                    *dbab-highlights*
+
+All highlight groups can be overridden by defining them before calling
+`require("dbab").setup()`. Groups not already defined will be set to their
+default values. Groups marked with (computed) are always recalculated based
+on your colorscheme.
+
+GRID                                                    *dbab-highlights-grid*
+
+    `DbabRowOdd`        Odd row background (computed)       ~Normal bg - 10
+    `DbabRowEven`       Even row background (computed)      ~Normal bg + 5
+    `DbabHeader`        Grid header row (computed)          Function fg bg
+    `DbabSeparator`     Grid separator lines                Comment
+    `DbabCellActive`    Active cell highlight               CursorLine
+
+WINDOW                                                *dbab-highlights-window*
+
+    `DbabFloat`         Float window background             NormalFloat
+    `DbabBorder`        Window border                       WinSeparator
+    `DbabTitle`         Window title text                   Title
+
+DATA TYPES                                         *dbab-highlights-datatypes*
+
+    `DbabNull`          NULL values                         Comment
+    `DbabNumber`        Numeric values                      Number
+    `DbabString`        String values                       Normal
+    `DbabBoolean`       Boolean values                      Boolean
+    `DbabDateTime`      Date/time values                    Special
+    `DbabUuid`          UUID values                         Constant
+    `DbabJson`          JSON values                         Function
+
+SCHEMA                                                *dbab-highlights-schema*
+
+    `DbabTable`         Table names                         Type
+    `DbabKey`           Key names                           Keyword
+    `DbabPK`            Primary key indicator               DiagnosticError
+    `DbabFK`            Foreign key indicator               Function
+
+SIDEBAR                                              *dbab-highlights-sidebar*
+
+    Icon colors:
+    `DbabSidebarIconConnection`   Connection icon           Number
+    `DbabSidebarIconActive`       Active connection icon    String
+    `DbabSidebarIconNewQuery`     New query icon            Function
+    `DbabSidebarIconBuffers`      Buffers icon              Function
+    `DbabSidebarIconSaved`        Saved queries icon        Keyword
+    `DbabSidebarIconSchemas`      Schemas icon              Special
+    `DbabSidebarIconSchema`       Schema icon               Type
+    `DbabSidebarIconTable`        Table icon                Type
+    `DbabSidebarIconColumn`       Column icon               Function
+    `DbabSidebarIconPK`           Primary key icon          DiagnosticError
+
+    Text:
+    `DbabSidebarText`             Default text              Normal
+    `DbabSidebarTextActive`       Active item text          String (bold)
+    `DbabSidebarType`             Type annotation           Comment
+
+HISTORY                                              *dbab-highlights-history*
+
+    `DbabHistoryHeader`           Section header            Title (bold)
+    `DbabHistoryRowOdd`           Odd row background        (computed)
+    `DbabHistoryRowEven`          Even row background       (computed)
+    `DbabHistoryTime`             Timestamp                 Comment
+    `DbabHistoryVerb`             SQL verb                  Keyword
+    `DbabHistoryTarget`           Target table name         Type
+    `DbabHistoryDuration`         Execution duration        Number
+    `DbabHistoryConnName`         Connection name           Normal
+
+    Verb-specific colors:
+    `DbabHistorySelect`           SELECT queries            Function
+    `DbabHistoryInsert`           INSERT queries            String
+    `DbabHistoryUpdate`           UPDATE queries            Type
+    `DbabHistoryDelete`           DELETE queries            DiagnosticError
+    `DbabHistoryCreate`           CREATE statements         String
+    `DbabHistoryDrop`             DROP statements           DiagnosticError
+    `DbabHistoryAlter`            ALTER statements          Special
+    `DbabHistoryTruncate`         TRUNCATE statements       DiagnosticWarn
+
+    Hint badges (compact mode):
+    `DbabHistoryHintWhere`        WHERE clause hint         DiagnosticWarn
+    `DbabHistoryHintJoin`         JOIN clause hint          Special
+    `DbabHistoryHintOrder`        ORDER BY hint             Keyword
+    `DbabHistoryHintGroup`        GROUP BY hint             Type
+    `DbabHistoryHintLimit`        LIMIT hint                Number
+
+TAB BAR                                              *dbab-highlights-tabbar*
+
+    `DbabTabActive`               Active tab                bg=#3a3a4a (bold)
+    `DbabTabActiveIcon`           Active tab icon           bg=#3a3a4a fg=#a6e3a1
+    `DbabTabInactive`             Inactive tab              Comment
+    `DbabTabInactiveIcon`         Inactive tab icon         Comment
+    `DbabTabModified`             Modified indicator        DiagnosticWarn
+    `DbabTabIconSaved`            Saved query icon          String
+    `DbabTabIconUnsaved`          Unsaved query icon        Function
+    `DbabTabbarBg`                Tab bar background        Normal
+
+CUSTOMIZATION EXAMPLE                          *dbab-highlights-customization*
+
+Override highlights before setup: >lua
+    -- Custom highlight overrides
+    vim.api.nvim_set_hl(0, "DbabHeader", { bg = "#ff6600", fg = "#000000" })
+    vim.api.nvim_set_hl(0, "DbabNull", { fg = "#555555", italic = true })
+
+    require("dbab").setup({ ... })
+<
 
 ==============================================================================
 TYPES                                                              *dbab-types*
