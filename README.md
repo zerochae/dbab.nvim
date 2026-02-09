@@ -167,7 +167,7 @@ require("dbab").setup({
     -- },
     sidebar = {
       width = 0.2,
-      use_brand_icon = false,   -- true: per-DB icons, false: generic 󰆼
+      use_brand_icon = false,   -- true: per-DB icons, false: generic db icon
       use_brand_color = false,  -- true: per-DB brand colors, false: single color (Number)
       show_brand_name = false,  -- true: show [postgres] label, false: icon + name only
     },
@@ -348,9 +348,9 @@ ui = {
 
 | Option | `false` (default) | `true` |
 |--------|-------------------|--------|
-| `use_brand_icon` | Generic icon `󰆼` for all DBs | Per-DB icons (e.g., PostgreSQL , MySQL ) |
-| `use_brand_color` | Single color (`Number` hl) | Brand colors (PostgreSQL blue, Redis red, etc.) |
-| `show_brand_name` | `󰆼 my_db` | `󰆼 [postgres] my_db` |
+| `use_brand_icon` | Generic DB icon for all connections | Per-DB brand icons (PostgreSQL, MySQL, etc.) |
+| `use_brand_color` | Single color (`Number` highlight) | Per-DB brand colors (blue, red, green, etc.) |
+| `show_brand_name` | `icon my_db` | `icon [postgres] my_db` |
 
 ## Highlight Groups
 
