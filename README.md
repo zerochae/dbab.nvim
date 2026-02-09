@@ -281,48 +281,24 @@ ui = {
 
 #### table
 
-![Result Viewer](./screenshots/result.png)
+![style-table](./screenshots/result.png)
 
 
 #### raw
 
-```
- id | name  | email
-----+-------+-------------------
-  1 | Alice | alice@example.com
-  2 | Bob   | bob@example.com
-```
+![style-raw](./screenshots/style-raw.png)
 
 #### json
 
-```json
-[
-  {"id":"1","name":"Alice","email":"alice@example.com"},
-  {"id":"2","name":"Bob","email":"bob@example.com"}
-]
-```
+![style-json](./screenshots/style-json.png)
 
 #### vertical
 
-```
--[ RECORD 1 ]----------------
-id    | 1
-name  | Alice
-email | alice@example.com
--[ RECORD 2 ]----------------
-id    | 2
-name  | Bob
-email | bob@example.com
-```
+![style-vertical](./screenshots/style-vertical.png)
 
 #### markdown
 
-```markdown
-| id | name  | email             |
-|----|-------|-------------------|
-| 1  | Alice | alice@example.com |
-| 2  | Bob   | bob@example.com   |
-```
+![style-markdown](./screenshots/style-markdown.png)
 
 ## Connection URL Format
 

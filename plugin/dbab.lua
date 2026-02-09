@@ -18,7 +18,6 @@ vim.api.nvim_create_user_command("Dbab", function(opts)
     if args[2] then
       dbab.connect(args[2])
     else
-      -- 인자 없으면 picker 열기
       dbab.pick_connection()
     end
   elseif subcmd == "pick" then

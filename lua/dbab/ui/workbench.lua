@@ -668,7 +668,6 @@ local function render_result_lines(result, widths)
   local lines = {}
   local has_header = #result.columns > 0
 
-  -- 헤더 렌더링 (컬럼이 있을 때만)
   if has_header then
     local header = ""
     for i, col in ipairs(result.columns) do
@@ -679,7 +678,6 @@ local function render_result_lines(result, widths)
     table.insert(lines, header)
   end
 
-  -- 데이터 행 (borderless)
   for _, row in ipairs(result.rows) do
     local line = ""
     for i, cell in ipairs(row) do
@@ -1023,20 +1021,17 @@ function M.show_result(raw, elapsed)
 
   vim.api.nvim_buf_set_option(M.result_buf, "modifiable", true)
 
-  -- 에러인 경우 별도 처리 (예쁜 에러 포맷)
   if is_error_result(raw) then
     local lines, highlights = format_error(raw)
 
     vim.api.nvim_buf_set_lines(M.result_buf, 0, -1, false, lines)
     vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
 
-    -- 에러 표시시 line number 숨김
     if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
       vim.api.nvim_win_set_option(M.result_win, "number", false)
       vim.api.nvim_win_set_option(M.result_win, "relativenumber", false)
     end
 
-    -- 하이라이트 적용
     local ns = vim.api.nvim_create_namespace("dbab_result")
     vim.api.nvim_buf_clear_namespace(M.result_buf, ns, 0, -1)
     for _, hl in ipairs(highlights) do
@@ -1047,7 +1042,6 @@ function M.show_result(raw, elapsed)
     return
   end
 
-  -- Mutation 결과인 경우 (UPDATE/DELETE/INSERT 등)
   local is_mutation, verb, count = parse_mutation_result(raw)
   if is_mutation and verb then
     local lines, highlights = format_mutation_result(verb, count)
@@ -1055,20 +1049,17 @@ function M.show_result(raw, elapsed)
     vim.api.nvim_buf_set_lines(M.result_buf, 0, -1, false, lines)
     vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
 
-    -- Mutation 결과시 line number 숨김
     if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
       vim.api.nvim_win_set_option(M.result_win, "number", false)
       vim.api.nvim_win_set_option(M.result_win, "relativenumber", false)
     end
 
-    -- 하이라이트 적용
     local ns = vim.api.nvim_create_namespace("dbab_result")
     vim.api.nvim_buf_clear_namespace(M.result_buf, ns, 0, -1)
     for _, hl in ipairs(highlights) do
       vim.api.nvim_buf_add_highlight(M.result_buf, ns, hl.hl, hl.line, hl.col_start, hl.col_end)
     end
 
-    -- winbar 업데이트
     M.last_result = { columns = {}, rows = {}, row_count = count or 0, raw = raw }
     M.refresh_result_winbar()
 
@@ -1175,22 +1166,16 @@ function M.show_result(raw, elapsed)
   vim.api.nvim_buf_set_lines(M.result_buf, 0, -1, false, lines)
   vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
 
-  -- 하이라이팅 적용
   apply_highlights(M.result_buf, result, widths, has_header)
 
-  -- winbar 업데이트 (실행된 쿼리 표시)
   M.refresh_result_winbar()
 
-  -- 상태라인 업데이트
   local status = string.format(" Result: %d rows (%.1fms) ", result.row_count, elapsed)
   vim.notify(status, vim.log.levels.INFO)
 
-  -- 커서를 result grid로 이동
   if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
     vim.api.nvim_set_current_win(M.result_win)
-    -- 첫 번째 데이터 행으로 이동 (헤더 다음)
     pcall(vim.api.nvim_win_set_cursor, M.result_win, { 2, 0 })
-    -- Normal mode 유지
     vim.cmd("stopinsert")
   end
 end
@@ -1215,7 +1200,6 @@ function M.execute_query()
     return
   end
 
-  -- 커맨드 히스토리 저장 (이전/다음 쿼리 탐색용)
   table.insert(M.history, 1, query)
   if #M.history > 100 then
     table.remove(M.history)
@@ -1226,7 +1210,6 @@ function M.execute_query()
   local result = executor.execute(url, query)
   local elapsed = (vim.loop.hrtime() - start_time) / 1e6
 
-  -- Query History에 추가 (v6 history pane용)
   local parsed_result = parser.parse(result)
   query_history.add({
     query = query,
@@ -1236,7 +1219,6 @@ function M.execute_query()
     row_count = parsed_result and parsed_result.row_count or 0,
   })
 
-  -- History UI 새로고침
   if M.history_win and vim.api.nvim_win_is_valid(M.history_win) then
     get_history_ui().render()
   end
@@ -1248,7 +1230,7 @@ function M.execute_query()
   M.show_result(result, elapsed)
 end
 
----@return number|nil 기존에 같은 이름의 버퍼가 있으면 삭제
+---@return number|nil
 local function delete_existing_buf(name)
   for _, buf in ipairs(vim.api.nvim_list_bufs()) do
     if vim.api.nvim_buf_is_valid(buf) then
@@ -1261,7 +1243,6 @@ local function delete_existing_buf(name)
 end
 
 function M.open()
-  -- 이미 열려있으면 해당 탭으로 이동
   if M.tab_nr and vim.api.nvim_tabpage_is_valid(M.tab_nr) then
     local tabs = vim.api.nvim_list_tabpages()
     for i, tab in ipairs(tabs) do
@@ -1272,12 +1253,10 @@ function M.open()
     end
   end
 
-  -- 이전 상태 정리 (탭은 닫혔지만 상태가 남아있는 경우)
   if M.tab_nr then
     M.cleanup()
   end
 
-  -- 기존 dbab 버퍼 삭제
   delete_existing_buf("[dbab]")
 
   local cfg = config.get()
@@ -1290,7 +1269,6 @@ function M.open()
     layout = DEFAULT_LAYOUT
   end
 
-  -- 새 탭 생성
   vim.cmd("tabnew")
   local initial_buf = vim.api.nvim_get_current_buf()
   M.tab_nr = vim.api.nvim_get_current_tabpage()
@@ -1300,11 +1278,8 @@ function M.open()
   local row_count = #layout
   local row_height = math.floor(total_height / row_count)
 
-  -- 윈도우 맵: component -> window handle
   local windows = {}
 
-  -- Step 1: Row들을 먼저 생성 (수평 분할)
-  -- 현재 창 = 첫 번째 row 전체
   local row_wins = { vim.api.nvim_get_current_win() }
 
   for row_idx = 2, row_count do
@@ -1312,15 +1287,12 @@ function M.open()
     row_wins[row_idx] = vim.api.nvim_get_current_win()
   end
 
-  -- Step 2: 각 row 내에서 컴포넌트들을 생성 (수직 분할)
   for row_idx, row in ipairs(layout) do
     local row_win = row_wins[row_idx]
     vim.api.nvim_set_current_win(row_win)
 
-    -- 첫 번째 컴포넌트는 현재 row 윈도우 사용
     windows[row[1]] = row_win
 
-    -- 나머지 컴포넌트들은 vsplit으로 생성
     for col_idx = 2, #row do
       local comp = row[col_idx]
       vim.cmd("belowright vsplit")
@@ -1328,7 +1300,6 @@ function M.open()
     end
   end
 
-  -- Step 3: 각 row 높이 설정 (마지막 row 제외 - 자동으로 나머지 차지)
   for row_idx = 1, row_count - 1 do
     local row = layout[row_idx]
     local first_comp = row[1]
@@ -1337,7 +1308,6 @@ function M.open()
     end
   end
 
-  -- Step 4: 각 컴포넌트 너비 설정
   for _, row in ipairs(layout) do
     local row_widths = calculate_row_widths(row, total_width)
     for _, comp in ipairs(row) do
@@ -1348,17 +1318,14 @@ function M.open()
     end
   end
 
-  -- Step 5: 각 컴포넌트 초기화
   M._init_all_components(windows)
 
   pcall(vim.api.nvim_buf_delete, initial_buf, { force = true })
 
-  -- Sidebar로 포커스
   if M.sidebar_win and vim.api.nvim_win_is_valid(M.sidebar_win) then
     vim.api.nvim_set_current_win(M.sidebar_win)
   end
 
-  -- Autocmd 설정
   M._setup_autocmds()
 end
 
@@ -1378,7 +1345,6 @@ function M._init_all_components(windows)
   -- Editor
   if windows.editor then
     M.editor_win = windows.editor
-    -- 첫 번째 쿼리 탭 생성
     M.create_new_tab(nil, nil, connection.get_active_name(), false)
   end
 
@@ -1415,7 +1381,6 @@ end
 function M._setup_autocmds()
   local augroup = vim.api.nvim_create_augroup("DbabWorkbench", { clear = true })
 
-  -- 탭 닫힐 때 정리
   vim.api.nvim_create_autocmd("TabClosed", {
     group = augroup,
     callback = function()
@@ -1425,22 +1390,18 @@ function M._setup_autocmds()
     end,
   })
 
-  -- 창이 닫힐 때 상태 정리
   vim.api.nvim_create_autocmd("WinClosed", {
     group = augroup,
     callback = function(ev)
-      -- 현재 탭이 아니면 무시
       if M.tab_nr and vim.api.nvim_get_current_tabpage() ~= M.tab_nr then
         return
       end
 
       local closed_win = tonumber(ev.match)
-      -- 에디터 창이 닫힌 경우
       if closed_win == M.editor_win then
         M.editor_win = nil
         M.editor_buf = nil
       end
-      -- 사이드바가 닫힌 경우 전체 정리
       if closed_win == M.sidebar_win then
         vim.schedule(function()
           if M.tab_nr and vim.api.nvim_tabpage_is_valid(M.tab_nr) then
@@ -1452,7 +1413,6 @@ function M._setup_autocmds()
     end,
   })
 
-  -- 윈도우 리사이즈 시 레이아웃 재조정
   vim.api.nvim_create_autocmd("VimResized", {
     group = augroup,
     callback = function()
@@ -1464,7 +1424,6 @@ function M._setup_autocmds()
     end,
   })
 
-  -- Split 창 크기 변경 시 winbar 재렌더링 (Neovim 0.9+)
   vim.api.nvim_create_autocmd("WinResized", {
     group = augroup,
     callback = function()
@@ -1481,11 +1440,10 @@ function M._resize_layout()
   local cfg = config.get()
   local layout = cfg.ui.layout or DEFAULT_LAYOUT
   local total_width = vim.o.columns
-  local total_height = vim.o.lines - 4 -- tabline, statusline, cmdline 등 제외
+  local total_height = vim.o.lines - 4
   local row_count = #layout
   local row_height = math.floor(total_height / row_count)
 
-  -- 컴포넌트 → 윈도우 매핑
   local comp_to_win = {
     sidebar = M.sidebar_win,
     editor = M.editor_win,
@@ -1493,7 +1451,6 @@ function M._resize_layout()
     grid = M.result_win,
   }
 
-  -- Row 단위로 크기 조정
   for row_idx, row in ipairs(layout) do
     local row_widths = calculate_row_widths(row, total_width)
 
@@ -1501,7 +1458,6 @@ function M._resize_layout()
       local win = comp_to_win[comp]
       if win and vim.api.nvim_win_is_valid(win) then
         vim.api.nvim_win_set_width(win, row_widths[comp])
-        -- 마지막 row가 아니면 높이 설정
         if row_idx < row_count then
           vim.api.nvim_win_set_height(win, row_height)
         end
@@ -1519,10 +1475,8 @@ function M.open_editor(query)
   -- Create a new query tab
   M.create_new_tab(nil, query, connection.get_active_name(), false)
 
-  -- Editor로 포커스 이동
   if M.editor_win and vim.api.nvim_win_is_valid(M.editor_win) then
     vim.api.nvim_set_current_win(M.editor_win)
-    -- Insert 모드로 시작
     vim.cmd("startinsert!")
   end
 end
@@ -1657,7 +1611,7 @@ function M.yank_current_row()
   end
 
   local cursor = vim.api.nvim_win_get_cursor(M.result_win)
-  local row_idx = cursor[1] - 1 -- 헤더만 건너뜀 (borderless)
+  local row_idx = cursor[1] - 1
 
   if row_idx < 1 or row_idx > #M.last_result.rows then
     vim.notify("[dbab] No data row selected", vim.log.levels.WARN)

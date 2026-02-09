@@ -88,7 +88,6 @@ function M.render()
   local all_entries = history.get_all()
   local entries = {}
 
-  -- filter_by_connection이 true면 현재 연결의 항목만 표시
   if cfg.history.filter_by_connection then
     local current_conn = connection.get_active_name()
     if current_conn then
@@ -105,7 +104,6 @@ function M.render()
   local lines = {}
   local highlights = {}
 
-  -- Winbar header (filter_by_connection이면 연결명 표시)
   local winbar_text = "%#DbabHistoryHeader#" .. icons.header .. "History%*"
   if cfg.history.filter_by_connection then
     local current_conn = connection.get_active_name()
@@ -133,15 +131,12 @@ function M.render()
     table.insert(lines, empty_msg)
     table.insert(highlights, { line = 0, hl = "Comment", col_start = 0, col_end = -1 })
   else
-    local CONN_NAME_WIDTH = 8 -- DB 이름 고정 너비
-
-    --- DB 이름을 고정 너비로 맞춤
+    local CONN_NAME_WIDTH = 8
     ---@param name string
     ---@return string
     local function fit_conn_name(name)
       local display_len = vim.fn.strdisplaywidth(name)
       if display_len > CONN_NAME_WIDTH then
-        -- 긴 이름은 truncate
         local truncated = ""
         local len = 0
         for i = 0, vim.fn.strchars(name) - 1 do
@@ -681,7 +676,6 @@ function M.execute_entry()
     end)
   end
 
-  -- SELECT 쿼리는 바로 실행, 그 외는 확인 필요
   if verb == "SEL" then
     do_execute()
   else
