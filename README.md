@@ -167,7 +167,7 @@ require("dbab").setup({
   editor = {
     show_tabbar = true,       -- show tab bar above editor
   },
-  grid = {
+  result = {
     max_width = 120,
     max_height = 20,
     show_line_number = true,
@@ -252,21 +252,21 @@ Define your own pane arrangement:
 -- No history panel
 layout = {
   { "sidebar", "editor" },
-  { "grid" },
+  { "result" },
 }
 
 -- Editor on the left
 layout = {
   { "editor", "sidebar" },
-  { "grid", "history" },
+  { "result", "history" },
 }
 ```
 
-Components: `"sidebar"`, `"editor"`, `"history"`, `"grid"` (editor and grid are required)
+Components: `"sidebar"`, `"editor"`, `"history"`, `"result"` (editor and result are required)
 
 ### Result Styles
 
-Configure with `grid.style`:
+Configure with `result.style`:
 
 | Style | Description |
 |-------|-------------|
@@ -277,7 +277,7 @@ Configure with `grid.style`:
 | `"raw"` | Unprocessed CLI output |
 
 ```lua
-grid = {
+result = {
   style = "vertical",
 },
 ```

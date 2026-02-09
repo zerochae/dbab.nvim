@@ -11,7 +11,7 @@
 ---@field layout Dbab.Layout Declarative layout configuration
 ---@field sidebar Dbab.SidebarConfig
 ---@field editor Dbab.EditorConfig
----@field grid Dbab.GridConfig
+---@field result Dbab.ResultConfig
 ---@field history Dbab.HistoryConfig
 ---@field schema Dbab.SchemaConfig
 ---@field keymaps Dbab.Keymaps
@@ -34,7 +34,7 @@
 
 ---@alias Dbab.HeaderAlign "fit"|"full"
 
----@class Dbab.GridConfig
+---@class Dbab.ResultConfig
 ---@field max_width number Maximum grid width
 ---@field max_height number Maximum grid height
 ---@field show_line_number boolean Show line numbers in result grid
@@ -109,7 +109,7 @@
 -- Aliases for backward compatibility
 ---@alias DbabConfig Dbab.Config
 ---@alias DbabConnection Dbab.Connection
----@alias DbabGridConfig Dbab.GridConfig
+---@alias DbabGridConfig Dbab.ResultConfig
 ---@alias DbabSchemaConfig Dbab.SchemaConfig
 ---@alias DbabHistoryConfig Dbab.HistoryConfig
 ---@alias DbabHistoryEntry Dbab.HistoryEntry
@@ -213,7 +213,7 @@
 --- Layout Types
 ---============================================================================
 
----@alias Dbab.LayoutComponent "sidebar"|"editor"|"history"|"grid"
+---@alias Dbab.LayoutComponent "sidebar"|"editor"|"history"|"result"
 
 ---@alias Dbab.LayoutRow Dbab.LayoutComponent[]
 

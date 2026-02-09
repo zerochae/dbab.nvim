@@ -20,7 +20,7 @@ end
 -- Default layout for fallback
 local DEFAULT_LAYOUT = {
   { "sidebar", "editor" },
-  { "history", "grid" },
+  { "history", "result" },
 }
 
 --- Validate layout configuration
@@ -32,7 +32,7 @@ local function validate_layout(layout)
   end
 
   local has_editor = false
-  local has_grid = false
+  local has_result = false
   local seen = {}
 
   for _, row in ipairs(layout) do
@@ -45,15 +45,15 @@ local function validate_layout(layout)
       end
       seen[comp] = true
       if comp == "editor" then has_editor = true end
-      if comp == "grid" then has_grid = true end
+      if comp == "result" then has_result = true end
     end
   end
 
   if not has_editor then
     return false, "Missing required component: editor"
   end
-  if not has_grid then
-    return false, "Missing required component: grid"
+  if not has_result then
+    return false, "Missing required component: result"
   end
 
   return true, nil
@@ -143,7 +143,7 @@ M.last_conn_name = nil
 M.last_timestamp = nil
 
 ---@type number|nil
-M.last_grid_width = nil
+M.last_result_width = nil
 
 --- Apply syntax highlighting to SQL query for winbar using treesitter
 ---@param query string
@@ -296,7 +296,7 @@ function M.refresh_result_winbar()
     -- Calculate target width based on header_align setting
     local win_width = vim.api.nvim_win_get_width(M.result_win)
     local available_width = win_width - textoff
-    local header_align = cfg.grid.header_align or "fit"
+    local header_align = cfg.result.header_align or "fit"
 
     local target_width
     if header_align == "full" then
@@ -304,7 +304,7 @@ function M.refresh_result_winbar()
       target_width = available_width
     else
       -- "fit": align to grid width
-      local grid_width = M.last_grid_width or cfg.grid.max_width
+      local grid_width = M.last_result_width or cfg.result.max_width
       target_width = math.min(grid_width, available_width)
     end
 
@@ -1068,10 +1068,10 @@ function M.show_result(raw, elapsed)
   local cfg = config.get()
 
   if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
-    vim.api.nvim_win_set_option(M.result_win, "number", cfg.grid.show_line_number)
+    vim.api.nvim_win_set_option(M.result_win, "number", cfg.result.show_line_number)
   end
 
-  local result_style = cfg.grid.style or "table"
+  local result_style = cfg.result.style or "table"
   local result = parser.parse(raw, result_style)
   M.last_result = result
 
@@ -1157,7 +1157,7 @@ function M.show_result(raw, elapsed)
   for _, w in ipairs(widths) do
     grid_width = grid_width + w + 2 -- +2 for " " padding on each side
   end
-  M.last_grid_width = grid_width
+  M.last_result_width = grid_width
 
   vim.api.nvim_buf_set_lines(M.result_buf, 0, -1, false, lines)
   vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
@@ -1349,8 +1349,8 @@ function M._init_all_components(windows)
   end
 
   -- Grid (Result)
-  if windows.grid then
-    M.result_win = windows.grid
+  if windows.result then
+    M.result_win = windows.result
     M.result_buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_win_set_buf(M.result_win, M.result_buf)
     vim.api.nvim_buf_set_name(M.result_buf, "[dbab] Result")
@@ -1360,7 +1360,7 @@ function M._init_all_components(windows)
     vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
     vim.api.nvim_win_set_option(M.result_win, "cursorline", true)
     vim.api.nvim_win_set_option(M.result_win, "wrap", false)
-    vim.api.nvim_win_set_option(M.result_win, "number", cfg.grid.show_line_number)
+    vim.api.nvim_win_set_option(M.result_win, "number", cfg.result.show_line_number)
     vim.api.nvim_win_set_option(M.result_win, "relativenumber", false)
     M.setup_result_keymaps()
     vim.schedule(function()
@@ -1448,7 +1448,7 @@ function M._resize_layout()
     sidebar = M.sidebar_win,
     editor = M.editor_win,
     history = M.history_win,
-    grid = M.result_win,
+    result = M.result_win,
   }
 
   for row_idx, row in ipairs(layout) do
@@ -1682,7 +1682,7 @@ function M.cleanup()
   M.last_duration = nil
   M.last_conn_name = nil
   M.last_timestamp = nil
-  M.last_grid_width = nil
+  M.last_result_width = nil
   M.query_tabs = {}
   M.active_tab = 0
 end

@@ -11,10 +11,10 @@ describe("config", function()
       assert.are.equal(0, #config.defaults.connections)
     end)
 
-    it("has grid configuration", function()
-      assert.is_not_nil(config.defaults.grid)
-      assert.is_not_nil(config.defaults.grid.style)
-      assert.are.equal("table", config.defaults.grid.style)
+    it("has result configuration", function()
+      assert.is_not_nil(config.defaults.result)
+      assert.is_not_nil(config.defaults.result.style)
+      assert.are.equal("table", config.defaults.result.style)
     end)
 
     it("has sidebar configuration", function()
@@ -70,19 +70,19 @@ describe("config", function()
       local opts = config.get()
       assert.are.equal(1, #opts.connections)
       assert.are.equal("mydb", opts.connections[1].name)
-      assert.is_not_nil(opts.grid.max_width)
+      assert.is_not_nil(opts.result.max_width)
     end)
 
     it("allows overriding nested options", function()
       config.setup({
-        grid = {
+        result = {
           max_width = 80,
         },
       })
 
       local opts = config.get()
-      assert.are.equal(80, opts.grid.max_width)
-      assert.is_not_nil(opts.grid.max_height)
+      assert.are.equal(80, opts.result.max_width)
+      assert.is_not_nil(opts.result.max_height)
     end)
 
     it("migrates legacy ui.* config", function()
@@ -94,7 +94,7 @@ describe("config", function()
       })
 
       local opts = config.get()
-      assert.are.equal(80, opts.grid.max_width)
+      assert.are.equal(80, opts.result.max_width)
       assert.is_true(config._has_legacy_config)
     end)
 

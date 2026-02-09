@@ -107,7 +107,7 @@ layout ~
 
     - `"classic"`: 4-pane layout (default)
     - `"wide"`: 3-column top + full-width bottom
-    - Custom: Array of rows, e.g., `{ { "sidebar", "editor" }, { "grid" } }`
+    - Custom: Array of rows, e.g., `{ { "sidebar", "editor" }, { "result" } }`
 
                                                            *dbab-config-sidebar*
 sidebar ~
@@ -126,13 +126,13 @@ editor ~
 
     - `show_tabbar`: Show tab bar above editor (default: true)
 
-                                                              *dbab-config-grid*
-grid ~
-    Result grid configuration.
-    Type: `Dbab.GridConfig`
+                                                            *dbab-config-result*
+result ~
+    Result configuration.
+    Type: `Dbab.ResultConfig`
 
-    - `max_width`: Maximum grid width (default: 120)
-    - `max_height`: Maximum grid height (default: 20)
+    - `max_width`: Maximum result width (default: 120)
+    - `max_height`: Maximum result height (default: 20)
     - `show_line_number`: Show line numbers (default: true)
     - `header_align`: Winbar alignment - "fit" or "full" (default: "fit")
     - `style`: Result display style (default: "table")
@@ -237,7 +237,7 @@ Example configuration: >lua
       editor = {
         show_tabbar = true,
       },
-      grid = {
+      result = {
         max_width = 120,
         max_height = 20,
         show_line_number = true,
@@ -270,7 +270,7 @@ Example configuration: >lua
 Custom layout example: >lua
     layout = {
       { "sidebar", "editor" },
-      { "grid" },
+      { "result" },
     }
 <
 
@@ -452,7 +452,7 @@ All type definitions are in `lua/dbab/types.lua`.
                                                                  *Dbab.Config*
 Dbab.Config ~
     Main configuration type.
-    Fields: `connections`, `layout`, `sidebar`, `editor`, `grid`,
+    Fields: `connections`, `layout`, `sidebar`, `editor`, `result`,
             `history`, `schema`, `keymaps`, `highlights`
 
                                                              *Dbab.Connection*
@@ -495,8 +495,8 @@ Dbab.HistoryConfig ~
 Dbab.Layout ~
     Layout configuration (preset string or custom array).
     Presets: `"classic"`, `"wide"`
-    Components: `"sidebar"`, `"editor"`, `"history"`, `"grid"`
-    Required: `"editor"` and `"grid"` must be present
+    Components: `"sidebar"`, `"editor"`, `"history"`, `"result"`
+    Required: `"editor"` and `"result"` must be present
 
 ==============================================================================
 vim:tw=78:ts=8:ft=help:norl:

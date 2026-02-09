@@ -73,8 +73,8 @@ function M.show(raw, elapsed)
   end
 
   local opts = config.get()
-  local width = math.min(max_line_width + 4, opts.ui.grid.max_width, vim.o.columns - 10)
-  local height = math.min(#lines + 2, opts.ui.grid.max_height, vim.o.lines - 10)
+  local width = math.min(max_line_width + 4, opts.result.max_width, vim.o.columns - 10)
+  local height = math.min(#lines + 2, opts.result.max_height, vim.o.lines - 10)
 
   local popup = Popup({
     position = "50%",

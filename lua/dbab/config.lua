@@ -8,7 +8,7 @@ M.layout_presets = {
   classic = {
     layout = {
       { "sidebar", "editor" },
-      { "history", "grid" },
+      { "history", "result" },
     },
     sidebar_width = 0.2,
     history_width = 0.2,
@@ -16,7 +16,7 @@ M.layout_presets = {
   wide = {
     layout = {
       { "sidebar", "editor", "history" },
-      { "grid" },
+      { "result" },
     },
     sidebar_width = 0.33,
     history_width = 0.33,
@@ -36,7 +36,7 @@ M.defaults = {
   editor = {
     show_tabbar = true,
   },
-  grid = {
+  result = {
     max_width = 120,
     max_height = 20,
     show_line_number = true,
@@ -134,7 +134,10 @@ local function migrate_legacy(opts)
     opts.editor = vim.tbl_deep_extend("force", opts.editor or {}, ui.editor)
   end
   if ui.grid then
-    opts.grid = vim.tbl_deep_extend("force", opts.grid or {}, ui.grid)
+    opts.result = vim.tbl_deep_extend("force", opts.result or {}, ui.grid)
+  end
+  if ui.result then
+    opts.result = vim.tbl_deep_extend("force", opts.result or {}, ui.result)
   end
   if ui.history then
     opts.history = vim.tbl_deep_extend("force", opts.history or {}, ui.history)
@@ -147,6 +150,10 @@ end
 function M.setup(opts)
   local user_opts = opts or {}
   user_opts = migrate_legacy(user_opts)
+  if user_opts.grid and not user_opts.result then
+    user_opts.result = user_opts.grid
+    user_opts.grid = nil
+  end
   M.options = vim.tbl_deep_extend("force", {}, M.defaults, user_opts)
   M._apply_layout_preset()
 end
