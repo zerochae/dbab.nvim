@@ -110,6 +110,98 @@ line3]]
       assert.are.equal(1, #result.rows)
       assert.are.equal("test", result.rows[1][2])
     end)
+
+    it("handles raw style", function()
+      local raw = "line1\nline2"
+      local result = parser.parse(raw, "raw")
+
+      assert.are.equal(1, #result.columns)
+      assert.are.equal("raw", result.columns[1])
+      assert.are.equal(2, #result.rows)
+      assert.are.equal("line1", result.rows[1][1])
+      assert.are.equal(raw, result.raw)
+    end)
+
+    it("handles json style", function()
+      local raw = [[
+ id | name
+----+-------
+  1 | Alice
+  2 | Bob
+(2 rows)]]
+
+      local result = parser.parse(raw, "json")
+
+      assert.are.equal(2, result.row_count)
+      -- Check if raw contains valid JSON structure
+      assert.is_true(result.raw:find('%[') ~= nil)
+      assert.is_true(result.raw:find('Alice') ~= nil)
+      assert.is_true(result.raw:find('"id"') ~= nil)
+    end)
+
+    it("handles vertical style", function()
+      local raw = [[
+ id | name
+----+-------
+  1 | Alice
+  2 | Bob
+(2 rows)]]
+
+      local result = parser.parse(raw, "vertical")
+
+      assert.are.equal(2, result.row_count)
+      assert.are.equal(2, #result.columns)
+      assert.is_true(result.raw:find("RECORD 1") ~= nil)
+      assert.is_true(result.raw:find("RECORD 2") ~= nil)
+      assert.is_true(result.raw:find("Alice") ~= nil)
+      -- rows는 string[][] 형태
+      assert.is_true(type(result.rows[1]) == "table")
+    end)
+
+    it("handles vertical style with empty result", function()
+      local raw = [[
+ id | name
+----+------
+(0 rows)]]
+
+      local result = parser.parse(raw, "vertical")
+
+      assert.are.equal(0, result.row_count)
+      assert.are.equal(0, #result.rows)
+    end)
+
+    it("handles markdown style", function()
+      local raw = [[
+ id | name
+----+-------
+  1 | Alice
+  2 | Bob
+(2 rows)]]
+
+      local result = parser.parse(raw, "markdown")
+
+      assert.are.equal(2, result.row_count)
+      assert.are.equal(2, #result.columns)
+      -- Markdown 테이블 형식 확인
+      assert.is_true(result.raw:find("^|") ~= nil)
+      assert.is_true(result.raw:find("%-%-") ~= nil)
+      assert.is_true(result.raw:find("Alice") ~= nil)
+      -- Header + separator + 2 data rows = 4 lines
+      assert.are.equal(4, #result.rows)
+    end)
+
+    it("handles markdown style with empty result", function()
+      local raw = [[
+ id | name
+----+------
+(0 rows)]]
+
+      local result = parser.parse(raw, "markdown")
+
+      assert.are.equal(0, result.row_count)
+      -- Header + separator만 존재
+      assert.are.equal(2, #result.rows)
+    end)
   end)
 
   describe("calculate_column_widths", function()

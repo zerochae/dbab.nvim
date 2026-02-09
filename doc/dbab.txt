@@ -120,6 +120,12 @@ ui ~
         - `max_height`: Maximum grid height (default: 20)
         - `show_line_number`: Show line numbers (default: true)
         - `header_align`: Winbar alignment - "fit" or "full" (default: "fit")
+        - `style`: Result display style (default: "table")
+            - `"table"`: Table grid with zebra striping
+            - `"json"`: JSON syntax highlighting
+            - `"raw"`: Raw CLI output
+            - `"vertical"`: One column per line (like psql \x)
+            - `"markdown"`: Markdown table
 
                                                            *dbab-config-keymaps*
 keymaps ~

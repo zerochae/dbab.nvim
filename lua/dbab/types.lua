@@ -17,6 +17,8 @@
 ---@field name string Connection display name
 ---@field url string Database connection URL (supports env vars like $DATABASE_URL)
 
+---@alias Dbab.ResultStyle "table"|"json"|"raw"|"vertical"|"markdown"
+
 ---@class Dbab.UIConfig
 ---@field layout Dbab.Layout Declarative layout configuration
 ---@field grid Dbab.GridConfig
@@ -36,6 +38,7 @@
 ---@field max_height number Maximum grid height
 ---@field show_line_number boolean Show line numbers in result grid
 ---@field header_align Dbab.HeaderAlign Winbar metadata alignment ("fit" = align to grid, "full" = align to window edge)
+---@field style? Dbab.ResultStyle Result display style ("table" = table grid, "json" = JSON, "raw" = plain text, "vertical" = record per line, "markdown" = markdown table)
 
 ---@class Dbab.SchemaConfig
 ---@field show_system_schemas boolean Show system schemas (pg_catalog, information_schema)

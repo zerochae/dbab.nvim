@@ -14,6 +14,10 @@ describe("config", function()
     it("has UI configuration", function()
       assert.is_not_nil(config.defaults.ui)
       assert.is_not_nil(config.defaults.ui.grid)
+
+      -- Grid style option
+      assert.is_not_nil(config.defaults.ui.grid.style)
+      assert.are.equal("table", config.defaults.ui.grid.style)
     end)
 
     it("has keymaps configuration", function()

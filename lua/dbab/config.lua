@@ -41,6 +41,7 @@ M.defaults = {
       max_height = 20,
       show_line_number = true,
       header_align = "fit", -- "fit" = align metadata to grid width, "full" = align to window edge
+      style = "table", -- "table" (default), "json", "raw", "vertical", "markdown"
     },
   },
   keymaps = {

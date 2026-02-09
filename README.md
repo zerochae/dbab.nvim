@@ -13,7 +13,7 @@ A lightweight database client for Neovim. Query databases directly from your edi
 - **Query history**: Track executed queries with timing, re-execute or load to editor
 - **Multiple query tabs**: Work with multiple queries simultaneously
 - **Save queries**: Store frequently used queries per connection
-- **Result viewer**: View results with zebra striping and type-aware highlighting
+- **Result viewer**: Multiple display styles (table, json, vertical, markdown, raw) with type-aware highlighting
 
 ## Layout
 
@@ -172,6 +172,7 @@ require("dbab").setup({
       max_height = 20,
       show_line_number = true,
       header_align = "fit",  -- "fit" or "full"
+      style = "table", -- "table" (default), "json", "raw", "vertical", "markdown"
     },
   },
   keymaps = {
@@ -257,6 +258,71 @@ layout = {
 ```
 
 Components: `"sidebar"`, `"editor"`, `"history"`, `"grid"` (editor and grid are required)
+
+### Result Styles
+
+Configure with `ui.grid.style`:
+
+| Style | Description |
+|-------|-------------|
+| `"table"` | Table grid with zebra striping and type-aware highlighting (default) |
+| `"json"` | JSON format with Treesitter syntax highlighting |
+| `"vertical"` | One record per block, column names on the left (like `psql \x`) |
+| `"markdown"` | Markdown table with Treesitter syntax highlighting |
+| `"raw"` | Unprocessed CLI output |
+
+```lua
+ui = {
+  grid = {
+    style = "vertical",
+  },
+}
+```
+
+#### table
+
+![Result Viewer](./screenshots/result.png)
+
+
+#### raw
+
+```
+ id | name  | email
+----+-------+-------------------
+  1 | Alice | alice@example.com
+  2 | Bob   | bob@example.com
+```
+
+#### json
+
+```json
+[
+  {"id":"1","name":"Alice","email":"alice@example.com"},
+  {"id":"2","name":"Bob","email":"bob@example.com"}
+]
+```
+
+#### vertical
+
+```
+-[ RECORD 1 ]----------------
+id    | 1
+name  | Alice
+email | alice@example.com
+-[ RECORD 2 ]----------------
+id    | 2
+name  | Bob
+email | bob@example.com
+```
+
+#### markdown
+
+```markdown
+| id | name  | email             |
+|----|-------|-------------------|
+| 1  | Alice | alice@example.com |
+| 2  | Bob   | bob@example.com   |
+```
 
 ## Connection URL Format
 

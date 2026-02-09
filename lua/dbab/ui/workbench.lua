@@ -694,6 +694,26 @@ local function render_result_lines(result, widths)
   return lines, has_header
 end
 
+---@param cell string
+---@return string
+local function detect_cell_hl(cell)
+  if cell == "" or cell:upper() == "NULL" then
+    return "DbabNull"
+  elseif cell:match("^%-?%d+%.?%d*$") then
+    return "DbabNumber"
+  elseif cell:match("^[Tt]rue$") or cell:match("^[Ff]alse$") or cell == "t" or cell == "f" then
+    return "DbabBoolean"
+  elseif cell:match("^%d%d%d%d%-%d%d%-%d%d") then
+    return "DbabDateTime"
+  elseif cell:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") then
+    return "DbabUuid"
+  elseif cell:match("^[%[{]") then
+    return "DbabJson"
+  else
+    return "DbabString"
+  end
+end
+
 ---@param bufnr number
 ---@param result Dbab.QueryResult
 ---@param widths number[]
@@ -705,53 +725,28 @@ local function apply_highlights(bufnr, result, widths, has_header)
   local header_offset = has_header and 1 or 0
   local total_lines = #result.rows + header_offset
 
-  -- Header 전체 라인에 DbabHeader 적용 (line 0, 헤더가 있을 때만)
   if has_header then
     vim.api.nvim_buf_add_highlight(bufnr, ns, "DbabHeader", 0, 0, -1)
   end
 
-  -- 데이터 행에만 Zebra striping 적용
   for line_num = header_offset, total_lines - 1 do
     local row_idx = line_num - header_offset + 1
     local row_hl = row_idx % 2 == 1 and "DbabRowOdd" or "DbabRowEven"
     vim.api.nvim_buf_add_highlight(bufnr, ns, row_hl, line_num, 0, -1)
   end
 
-  -- 데이터 행 셀별 타입 하이라이팅
   for row_idx, row in ipairs(result.rows) do
-    local line_num = row_idx - 1 + header_offset -- 0-indexed line
+    local line_num = row_idx - 1 + header_offset
 
     local col_start = 0
     for col_idx, cell in ipairs(row) do
       local w = widths[col_idx] or #cell
-      local cell_start = col_start + 1 -- 앞 공백 이후
+      local cell_start = col_start + 1
       local display = cell == "" and "NULL" or cell
+      local hl_group = detect_cell_hl(cell)
 
-      local hl_group = nil
-      if cell == "" or cell:upper() == "NULL" then
-        hl_group = "DbabNull"
-      elseif cell:match("^%-?%d+%.?%d*$") then
-        hl_group = "DbabNumber"
-      elseif cell:match("^[Tt]rue$") or cell:match("^[Ff]alse$") or cell == "t" or cell == "f" then
-        hl_group = "DbabBoolean"
-      elseif cell:match("^%d%d%d%d%-%d%d%-%d%d") then
-        -- DateTime: 2024-01-15, 2024-01-15 12:30:00, etc
-        hl_group = "DbabDateTime"
-      elseif cell:match("^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$") then
-        -- UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-        hl_group = "DbabUuid"
-      elseif cell:match("^[%[{]") then
-        -- JSON: starts with [ or {
-        hl_group = "DbabJson"
-      else
-        hl_group = "DbabString"
-      end
+      vim.api.nvim_buf_add_highlight(bufnr, ns, hl_group, line_num, cell_start, cell_start + #display)
 
-      if hl_group then
-        vim.api.nvim_buf_add_highlight(bufnr, ns, hl_group, line_num, cell_start, cell_start + #display)
-      end
-
-      -- 다음 셀: 공백(1) + value(w) + 공백(1) = w + 2
       col_start = col_start + w + 2
     end
   end
@@ -1083,18 +1078,87 @@ function M.show_result(raw, elapsed)
     return
   end
 
-  -- 정상 결과시 line number 설정 (config 기반)
+  local cfg = config.get()
+
   if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
-    local cfg = config.get()
     vim.api.nvim_win_set_option(M.result_win, "number", cfg.ui.grid.show_line_number)
   end
 
-  local result = parser.parse(raw)
+  local result_style = cfg.ui.grid.style or "table"
+  local result = parser.parse(raw, result_style)
   M.last_result = result
 
-  if #result.rows == 0 then
+  pcall(vim.treesitter.stop, M.result_buf)
+  vim.api.nvim_buf_set_option(M.result_buf, "filetype", "")
+
+  if result.row_count == 0 then
     vim.api.nvim_buf_set_lines(M.result_buf, 0, -1, false, { "No results returned" })
     vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
+    return
+  end
+
+  if result_style == "raw" then
+    local raw_lines = vim.split(result.raw, "\n")
+    vim.api.nvim_buf_set_lines(M.result_buf, 0, -1, false, raw_lines)
+    vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
+    M.refresh_result_winbar()
+    return
+  end
+
+  if result_style == "json" then
+    local json_lines = vim.split(result.raw, "\n")
+    vim.api.nvim_buf_set_lines(M.result_buf, 0, -1, false, json_lines)
+    vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
+    local ok = pcall(vim.treesitter.start, M.result_buf, "json")
+    if not ok then
+      vim.api.nvim_buf_set_option(M.result_buf, "filetype", "json")
+    end
+    M.refresh_result_winbar()
+    return
+  end
+
+  if result_style == "vertical" then
+    local vert_lines = vim.split(result.raw, "\n")
+    vim.api.nvim_buf_set_lines(M.result_buf, 0, -1, false, vert_lines)
+    vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
+
+    local ns = vim.api.nvim_create_namespace("dbab_result")
+    vim.api.nvim_buf_clear_namespace(M.result_buf, ns, 0, -1)
+
+    for i, line in ipairs(vert_lines) do
+      local ln = i - 1
+      if line:match("^%-%[ RECORD %d+") then
+        vim.api.nvim_buf_add_highlight(M.result_buf, ns, "DbabHeader", ln, 0, -1)
+      else
+        local sep = line:find(" | ")
+        if sep then
+          local col_name = vim.trim(line:sub(1, sep - 1))
+          local col_start = line:find(col_name, 1, true)
+          vim.api.nvim_buf_add_highlight(M.result_buf, ns, "DbabKey", ln, col_start - 1, col_start - 1 + #col_name)
+
+          vim.api.nvim_buf_add_highlight(M.result_buf, ns, "DbabBorder", ln, sep - 1, sep + 2)
+
+          local value = vim.trim(line:sub(sep + 3))
+          local value_start = sep + 2
+          local hl_group = detect_cell_hl(value)
+          vim.api.nvim_buf_add_highlight(M.result_buf, ns, hl_group, ln, value_start, value_start + #value)
+        end
+      end
+    end
+
+    M.refresh_result_winbar()
+    return
+  end
+
+  if result_style == "markdown" then
+    local md_lines = vim.split(result.raw, "\n")
+    vim.api.nvim_buf_set_lines(M.result_buf, 0, -1, false, md_lines)
+    vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
+    local ok = pcall(vim.treesitter.start, M.result_buf, "markdown")
+    if not ok then
+      vim.api.nvim_buf_set_option(M.result_buf, "filetype", "markdown")
+    end
+    M.refresh_result_winbar()
     return
   end
 
