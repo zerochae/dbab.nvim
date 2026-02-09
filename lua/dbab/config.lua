@@ -35,6 +35,7 @@ M.defaults = {
     },
     history = {
       width = 0.2,
+      style = "compact", -- "compact" = one line per entry, "detailed" = multi-line with full query
     },
     grid = {
       max_width = 120,

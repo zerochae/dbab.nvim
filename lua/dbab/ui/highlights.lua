@@ -73,7 +73,7 @@ function M.setup()
     DbabCellActive = { link = "CursorLine" },
 
     -- Data Types
-    DbabNull = { link = "Comment", italic = true },
+    DbabNull = { link = "Comment" },
     DbabNumber = { link = "Number" },
     DbabString = { link = "Normal" },
     DbabBoolean = { link = "Boolean" },
@@ -101,7 +101,7 @@ function M.setup()
     -- Sidebar (text)
     DbabSidebarText = { link = "Normal" },
     DbabSidebarTextActive = { link = "String", bold = true },
-    DbabSidebarType = { link = "Comment", italic = true },
+    DbabSidebarType = { link = "Comment" },
 
     -- History
     DbabHistoryHeader = { link = "Title", bold = true },
@@ -111,7 +111,7 @@ function M.setup()
     DbabHistoryVerb = { link = "Keyword" },
     DbabHistoryTarget = { link = "Type" },
     DbabHistoryDuration = { link = "Number" },
-    DbabHistoryConnName = { fg = "#ffffff", bold = true },
+    DbabHistoryConnName = { link = "Normal" },
     DbabHistorySelect = { link = "Function" },
     DbabHistoryInsert = { link = "String" },
     DbabHistoryUpdate = { link = "Type" },
