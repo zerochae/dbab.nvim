@@ -32,10 +32,16 @@ M.defaults = {
     layout = "classic", -- "classic" | "wide" | Dbab.Layout
     sidebar = {
       width = 0.2,
+      use_brand_icon = false,
+      use_brand_color = false,
+      show_brand_name = false,
     },
     history = {
       width = 0.2,
       style = "compact", -- "compact" = one line per entry, "detailed" = multi-line with full query
+    },
+    editor = {
+      show_tabbar = true,
     },
     grid = {
       max_width = 120,

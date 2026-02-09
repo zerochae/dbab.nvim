@@ -165,7 +165,15 @@ require("dbab").setup({
     --   { "sidebar", "editor" },
     --   { "history", "grid" },
     -- },
-    sidebar = { width = 0.2 },
+    sidebar = {
+      width = 0.2,
+      use_brand_icon = false,   -- true: per-DB icons, false: generic 󰆼
+      use_brand_color = false,  -- true: per-DB brand colors, false: single color (Number)
+      show_brand_name = false,  -- true: show [postgres] label, false: icon + name only
+    },
+    editor = {
+      show_tabbar = true,       -- show tab bar above editor
+    },
     history = {
       width = 0.2,
       style = "compact", -- "compact" or "detailed"
@@ -324,6 +332,26 @@ ui = {
 }
 ```
 
+### Sidebar Display Options
+
+Control how database connections appear in the sidebar:
+
+```lua
+ui = {
+  sidebar = {
+    use_brand_icon = false,   -- default
+    use_brand_color = false,  -- default
+    show_brand_name = false,  -- default
+  },
+}
+```
+
+| Option | `false` (default) | `true` |
+|--------|-------------------|--------|
+| `use_brand_icon` | Generic icon `󰆼` for all DBs | Per-DB icons (e.g., PostgreSQL , MySQL ) |
+| `use_brand_color` | Single color (`Number` hl) | Brand colors (PostgreSQL blue, Redis red, etc.) |
+| `show_brand_name` | `󰆼 my_db` | `󰆼 [postgres] my_db` |
+
 ## Highlight Groups
 
 All highlight groups can be overridden by defining them before `setup()`.
@@ -372,6 +400,13 @@ Groups marked with **(computed)** are always recalculated based on your colorsch
 
 | Group | Default | Description |
 |-------|---------|-------------|
+| `DbabIconDb` | `Number` | Default DB icon color (`use_brand_color = false`) |
+| `DbabIconPostgres` | `fg=#4169E1` | PostgreSQL brand color (bold) |
+| `DbabIconMysql` | `fg=#4479A1` | MySQL brand color (bold) |
+| `DbabIconMariadb` | `fg=#003545` | MariaDB brand color (bold) |
+| `DbabIconSqlite` | `fg=#003B57` | SQLite brand color (bold) |
+| `DbabIconRedis` | `fg=#FF4438` | Redis brand color (bold) |
+| `DbabIconMongodb` | `fg=#47A248` | MongoDB brand color (bold) |
 | `DbabSidebarIconConnection` | `Number` | Connection icon |
 | `DbabSidebarIconActive` | `String` | Active connection icon |
 | `DbabSidebarIconNewQuery` | `Function` | New query icon |

@@ -4,6 +4,7 @@ local parser = require("dbab.utils.parser")
 local storage = require("dbab.core.storage")
 local query_history = require("dbab.core.history")
 local config = require("dbab.config")
+local icons = require("dbab.ui.icons")
 
 -- Lazy load to avoid circular dependency
 ---@return table
@@ -252,13 +253,6 @@ local function format_duration(ms)
   end
 end
 
--- Result winbar icons
-local result_icons = {
-  db = "󰆼",
-  time = "󰅐",
-  rows = "󰓫",
-  duration = "󱎫",
-}
 
 --- Update result winbar with query info
 function M.refresh_result_winbar()
@@ -272,14 +266,14 @@ function M.refresh_result_winbar()
   local textoff = get_textoff(M.result_win)
   local indent = string.rep(" ", textoff)
 
-  local winbar_text = "%#DbabHistoryHeader#󰓫 Result%*"
+  local winbar_text = "%#DbabHistoryHeader#" .. icons.result .. " Result%*"
   if M.last_query then
     -- Build prefix: [󰆼 dbname]
     local prefix = ""
     local prefix_display = ""
     if M.last_conn_name then
-      prefix = "%#NonText#[%#DbabSidebarIconConnection#" .. result_icons.db .. " %#Normal#" .. M.last_conn_name .. "%#NonText#]%* "
-      prefix_display = "[" .. result_icons.db .. " " .. M.last_conn_name .. "] "
+      prefix = "%#NonText#[%#DbabSidebarIconConnection#" .. icons.db_default .. " %#Normal#" .. M.last_conn_name .. "%#NonText#]%* "
+      prefix_display = "[" .. icons.db_default .. " " .. M.last_conn_name .. "] "
     end
 
     -- Build suffix first to calculate available space for query
@@ -287,16 +281,16 @@ function M.refresh_result_winbar()
     local suffix_display_parts = {}
     if M.last_timestamp then
       local time_str = os.date("%H:%M", M.last_timestamp)
-      table.insert(suffix_parts, "%#Comment#" .. result_icons.time .. " " .. time_str .. "%*")
-      table.insert(suffix_display_parts, result_icons.time .. " " .. time_str)
+      table.insert(suffix_parts, "%#Comment#" .. icons.time .. " " .. time_str .. "%*")
+      table.insert(suffix_display_parts, icons.time .. " " .. time_str)
     end
     if M.last_result and M.last_result.row_count then
-      table.insert(suffix_parts, "%#DbabSidebarIconTable#" .. result_icons.rows .. "%* %#DbabNumber#" .. M.last_result.row_count .. " rows%*")
-      table.insert(suffix_display_parts, result_icons.rows .. " " .. M.last_result.row_count .. " rows")
+      table.insert(suffix_parts, "%#DbabSidebarIconTable#" .. icons.rows .. "%* %#DbabNumber#" .. M.last_result.row_count .. " rows%*")
+      table.insert(suffix_display_parts, icons.rows .. " " .. M.last_result.row_count .. " rows")
     end
     if M.last_duration then
-      table.insert(suffix_parts, "%#Comment#" .. result_icons.duration .. " " .. format_duration(M.last_duration) .. "%*")
-      table.insert(suffix_display_parts, result_icons.duration .. " " .. format_duration(M.last_duration))
+      table.insert(suffix_parts, "%#Comment#" .. icons.duration .. " " .. format_duration(M.last_duration) .. "%*")
+      table.insert(suffix_display_parts, icons.duration .. " " .. format_duration(M.last_duration))
     end
 
     -- Calculate target width based on header_align setting
@@ -385,12 +379,6 @@ M.active_tab = 0
 ---@type number|nil
 M.editor_buf = nil
 
--- Tab bar icons
-local icons = {
-  saved = "󰈙 ",      -- SQL file icon
-  unsaved = "󰓰 ",    -- New note icon
-  separator = " ",   -- Tab separator
-}
 
 --- Render the tab bar line for winbar (uses statusline syntax for highlights)
 -- Fixed total tab width (icon + name + padding)
@@ -434,7 +422,7 @@ local function render_tabbar()
 
   local parts = {}
   for i, tab in ipairs(M.query_tabs) do
-    local icon = tab.is_saved and icons.saved or icons.unsaved
+    local icon = tab.is_saved and (icons.query_file .. " ") or (icons.open_buffer .. " ")
     local is_active = i == M.active_tab
 
     -- Truncate name if needed
@@ -461,6 +449,12 @@ end
 --- Update the tab bar display (via winbar on editor window)
 function M.refresh_tabbar()
   if not M.editor_win or not vim.api.nvim_win_is_valid(M.editor_win) then
+    return
+  end
+
+  local cfg = config.get()
+  if not cfg.ui.editor.show_tabbar then
+    vim.api.nvim_win_set_option(M.editor_win, "winbar", "")
     return
   end
 
@@ -506,6 +500,7 @@ function M.switch_tab(index)
   pcall(vim.api.nvim_buf_set_name, tab.buf, "[dbab] " .. display_name .. " - " .. conn_name)
 
   M.refresh_tabbar()
+  get_sidebar().refresh()
 end
 
 --- Switch to next tab
@@ -589,11 +584,11 @@ function M.create_new_tab(name, content, conn_name, is_saved)
   if not tab_name then
     local count = 1
     for _, t in ipairs(M.query_tabs) do
-      if t.name:match("^new query") then
+      if t.name:match("^query%-") then
         count = count + 1
       end
     end
-    tab_name = count == 1 and "new query" or ("new query " .. count)
+    tab_name = "query-" .. count
   end
 
   ---@type Dbab.QueryTab
@@ -657,6 +652,7 @@ function M.create_new_tab(name, content, conn_name, is_saved)
   M.setup_editor_keymaps(buf)
 
   M.refresh_tabbar()
+  get_sidebar().refresh()
 
   return #M.query_tabs
 end
@@ -865,13 +861,13 @@ local function format_mutation_result(verb, count)
 
   -- Icons and colors per verb
   local verb_config = {
-    UPDATE = { icon = "󰏫", hl = "DbabHistoryUpdate", label = "updated" },
-    DELETE = { icon = "󰆴", hl = "DbabHistoryDelete", label = "deleted" },
-    INSERT = { icon = "󰐕", hl = "DbabHistoryInsert", label = "inserted" },
-    CREATE = { icon = "󰙴", hl = "DbabHistoryCreate", label = "created" },
-    DROP = { icon = "󰆴", hl = "DbabHistoryDelete", label = "dropped" },
-    ALTER = { icon = "󰏫", hl = "DbabHistoryAlter", label = "altered" },
-    TRUNCATE = { icon = "󰆴", hl = "DbabHistoryTruncate", label = "truncated" },
+    UPDATE = { icon = icons.mut_update, hl = "DbabHistoryUpdate", label = "updated" },
+    DELETE = { icon = icons.mut_delete, hl = "DbabHistoryDelete", label = "deleted" },
+    INSERT = { icon = icons.mut_insert, hl = "DbabHistoryInsert", label = "inserted" },
+    CREATE = { icon = icons.mut_create, hl = "DbabHistoryCreate", label = "created" },
+    DROP = { icon = icons.mut_delete, hl = "DbabHistoryDelete", label = "dropped" },
+    ALTER = { icon = icons.mut_update, hl = "DbabHistoryAlter", label = "altered" },
+    TRUNCATE = { icon = icons.mut_delete, hl = "DbabHistoryTruncate", label = "truncated" },
   }
 
   local cfg = verb_config[verb] or { icon = "✓", hl = "String", label = "completed" }
@@ -945,7 +941,7 @@ function M.save_query_by_buf(buf, callback)
     vim.schedule(function()
       vim.ui.input({
         prompt = "Query name: ",
-        default = tab.name:match("^new query") and "" or tab.name,
+        default = tab.name:match("^query%-") and "" or tab.name,
       }, function(input)
       if input and input ~= "" then
         -- Check if already exists

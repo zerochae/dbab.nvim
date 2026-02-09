@@ -87,9 +87,18 @@ function M.setup()
     DbabPK = { link = "DiagnosticError", bold = true },
     DbabFK = { link = "Function", bold = true },
 
+    -- Sidebar (DB type icons)
+    DbabIconDb = { link = "Number" },
+    DbabIconPostgres = { fg = "#4169E1", bold = true },
+    DbabIconMysql = { fg = "#4479A1", bold = true },
+    DbabIconSqlite = { fg = "#003B57", bold = true },
+    DbabIconMariadb = { fg = "#003545", bold = true },
+    DbabIconRedis = { fg = "#FF4438", bold = true },
+    DbabIconMongodb = { fg = "#47A248", bold = true },
+
     -- Sidebar (icon colors)
     DbabSidebarIconConnection = { link = "Number" },
-    DbabSidebarIconActive = { link = "String" },  -- green (connected status)
+    DbabSidebarIconActive = { link = "String" },
     DbabSidebarIconNewQuery = { link = "Function" },
     DbabSidebarIconBuffers = { link = "Function" },
     DbabSidebarIconSaved = { link = "Keyword" },

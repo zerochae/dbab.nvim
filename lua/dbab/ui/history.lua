@@ -3,6 +3,7 @@
 local history = require("dbab.core.history")
 local config = require("dbab.config")
 local connection = require("dbab.core.connection")
+local icons = require("dbab.ui.icons")
 
 local M = {}
 
@@ -14,11 +15,6 @@ M.win = nil
 
 ---@type table[] entry_line_map: {{start=N, finish=N}, ...} (1-indexed line numbers)
 M.entry_line_map = {}
-
--- Icons
-local icons = {
-  header = "󰋚 ",
-}
 
 --- Apply treesitter SQL syntax highlighting to a portion of a line
 ---@param buf number Buffer number
@@ -358,7 +354,7 @@ local function render_compact(entries, win_width, cfg)
     local time_str = os.date("%H:%M", entry.timestamp)
     local target = history.get_query_target(entry)
     local duration = history.format_duration(entry.duration_ms)
-    local conn_icon = "󰆼"
+    local conn_icon = icons.db_default
 
     -- Build line and track highlight positions
     local line = ""
@@ -599,7 +595,7 @@ local function render_detailed(entries, win_width, cfg)
 
     local meta_parts = {}
     if show_conn then
-      local conn_icon = "󰆼"
+      local conn_icon = icons.db_default
       local fitted_name = fit_conn_name(entry.conn_name or "unknown")
       table.insert(meta_parts, { text = conn_icon .. " " .. fitted_name, hl = "DbabHistoryConnName" })
     end
@@ -672,12 +668,12 @@ function M.render()
   local lines = {}
   local highlights = {}
 
-  local winbar_text = "%#DbabHistoryHeader#" .. icons.header .. "History%*"
+  local winbar_text = "%#DbabHistoryHeader#" .. icons.history .. " " .. "History%*"
   if cfg.history.filter_by_connection then
     local current_conn = connection.get_active_name()
     if current_conn then
-      local conn_icon = "󰆼 "
-      winbar_text = "%#DbabHistoryHeader#" .. icons.header .. "History %#NonText#[%#DbabSidebarIconConnection#" .. conn_icon .. "%#Normal#" .. current_conn .. "%#NonText#]%*"
+      local conn_icon = icons.db_default .. " "
+      winbar_text = "%#DbabHistoryHeader#" .. icons.history .. " " .. "History %#NonText#[%#DbabSidebarIconConnection#" .. conn_icon .. "%#Normal#" .. current_conn .. "%#NonText#]%*"
     end
   end
   -- Set winbar

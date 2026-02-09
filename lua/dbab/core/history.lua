@@ -192,17 +192,8 @@ end
 ---@param verb string
 ---@return string
 function M.get_verb_icon(verb)
-  local icons = {
-    SEL = "󰁕 ",
-    INS = "󰁔 ",
-    UPD = "󰁓 ",
-    DEL = "󰁒 ",
-    CRT = "󰙴 ",
-    DRP = "󰆴 ",
-    ALT = "󰏫 ",
-    TRC = "󰆴 ",
-  }
-  return icons[verb] or "󰘥 "
+  local icons = require("dbab.ui.icons")
+  return icons.verb(verb)
 end
 
 --- Format duration for display

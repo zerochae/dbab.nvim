@@ -64,15 +64,8 @@ end
 ---@param db_type string
 ---@return string
 function M.get_icon(db_type)
-  local icons = {
-    postgres = "󱤢",
-    mysql = "",
-    sqlite = "",
-    redis = "",
-    mongodb = "",
-    unknown = "",
-  }
-  return icons[db_type] or icons.unknown
+  local icons = require "dbab.ui.icons"
+  return icons.db(db_type)
 end
 
 return M

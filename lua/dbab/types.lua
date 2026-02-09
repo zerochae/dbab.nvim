@@ -22,12 +22,19 @@
 
 ---@class Dbab.UIConfig
 ---@field layout Dbab.Layout Declarative layout configuration
+---@field editor Dbab.EditorUIConfig
 ---@field grid Dbab.GridConfig
 ---@field sidebar Dbab.SidebarUIConfig
 ---@field history Dbab.HistoryUIConfig
 
+---@class Dbab.EditorUIConfig
+---@field show_tabbar boolean Show tab bar above editor (default true)
+
 ---@class Dbab.SidebarUIConfig
 ---@field width number Width as percentage (0.1~1.0)
+---@field use_brand_icon boolean Use per-DB brand icons (default false, uses generic db icon)
+---@field use_brand_color boolean Use per-DB brand colors for icons (default false)
+---@field show_brand_name boolean Show DB type label like [postgres] (default false)
 
 ---@class Dbab.HistoryUIConfig
 ---@field width number Width as percentage (0.1~1.0)
@@ -178,8 +185,11 @@
 ---| "header"
 ---| "connection"
 ---| "queries"
+---| "buffers"
+---| "saved_queries"
 ---| "new_query_action"
 ---| "saved_query"
+---| "open_buffer"
 ---| "schemas"
 ---| "schema"
 ---| "tables"
