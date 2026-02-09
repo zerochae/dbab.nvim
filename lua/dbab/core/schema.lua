@@ -96,7 +96,7 @@ function M.get_schemas(url)
 
   if db_type == "postgres" then
     local exclude_list = "'pg_toast', 'pg_temp_1', 'pg_toast_temp_1'"
-    if not opts.schema.show_system_schemas then
+    if not opts.sidebar.show_system_schemas then
       exclude_list = exclude_list .. ", 'information_schema', 'pg_catalog'"
     end
     query = string.format([[
@@ -450,7 +450,7 @@ function M.get_schemas_async(url, callback)
 
   if db_type == "postgres" then
     local exclude_list = "'pg_toast', 'pg_temp_1', 'pg_toast_temp_1'"
-    if not opts.schema.show_system_schemas then
+    if not opts.sidebar.show_system_schemas then
       exclude_list = exclude_list .. ", 'information_schema', 'pg_catalog'"
     end
     query = string.format([[

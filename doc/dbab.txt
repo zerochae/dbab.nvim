@@ -118,6 +118,7 @@ sidebar ~
     - `use_brand_icon`: Use per-DB brand icons (default: false)
     - `use_brand_color`: Use per-DB brand colors (default: false)
     - `show_brand_name`: Show DB type label like [postgres] (default: false)
+    - `show_system_schemas`: Show system schemas like pg_catalog (default: true)
 
                                                             *dbab-config-editor*
 editor ~
@@ -136,7 +137,7 @@ result ~
     - `show_line_number`: Show line numbers (default: true)
     - `header_align`: Winbar alignment - "fit" or "full" (default: "fit")
     - `style`: Result display style (default: "table")
-        - `"table"`: Table grid with zebra striping
+        - `"table"`: Table with zebra striping
         - `"json"`: JSON syntax highlighting
         - `"raw"`: Raw CLI output
         - `"vertical"`: One column per line (like psql \x)
@@ -157,13 +158,6 @@ history ~
     - `filter_by_connection`: Filter by current connection (default: true)
     - `query_display`: How to display query - "short", "full", "auto" (default: "auto")
     - `short_hints`: Hints to show in short mode (default: {"where","join","order","group","limit"})
-
-                                                            *dbab-config-schema*
-schema ~
-    Schema display configuration.
-    Type: `Dbab.SchemaConfig`
-
-    - `show_system_schemas`: Show system schemas (default: true)
 
                                                            *dbab-config-keymaps*
 keymaps ~
@@ -258,9 +252,6 @@ Example configuration: >lua
         open = "<Leader>db",
         execute = "<CR>",
       },
-      schema = {
-        show_system_schemas = true,
-      },
       highlights = {
         DbabHeader = { bg = "#ff6600", fg = "#000000" },
       },
@@ -335,12 +326,12 @@ All highlight groups can be overridden by defining them before calling
 default values. Groups marked with (computed) are always recalculated based
 on your colorscheme.
 
-GRID                                                    *dbab-highlights-grid*
+RESULT                                                *dbab-highlights-result*
 
     `DbabRowOdd`        Odd row background (computed)       ~Normal bg - 10
     `DbabRowEven`       Even row background (computed)      ~Normal bg + 5
-    `DbabHeader`        Grid header row (computed)          Function fg bg
-    `DbabSeparator`     Grid separator lines                Comment
+    `DbabHeader`        Result header row (computed)        Function fg bg
+    `DbabSeparator`     Result separator lines              Comment
     `DbabCellActive`    Active cell highlight               CursorLine
 
 WINDOW                                                *dbab-highlights-window*
@@ -453,7 +444,7 @@ All type definitions are in `lua/dbab/types.lua`.
 Dbab.Config ~
     Main configuration type.
     Fields: `connections`, `layout`, `sidebar`, `editor`, `result`,
-            `history`, `schema`, `keymaps`, `highlights`
+            `history`, `keymaps`, `highlights`
 
                                                              *Dbab.Connection*
 Dbab.Connection ~

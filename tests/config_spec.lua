@@ -53,9 +53,8 @@ describe("config", function()
       assert.is_not_nil(config.defaults.keymaps.result.yank_row)
     end)
 
-    it("has schema configuration", function()
-      assert.is_not_nil(config.defaults.schema)
-      assert.is_true(config.defaults.schema.show_system_schemas)
+    it("has show_system_schemas in sidebar", function()
+      assert.is_true(config.defaults.sidebar.show_system_schemas)
     end)
   end)
 

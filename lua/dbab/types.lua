@@ -13,7 +13,6 @@
 ---@field editor Dbab.EditorConfig
 ---@field result Dbab.ResultConfig
 ---@field history Dbab.HistoryConfig
----@field schema Dbab.SchemaConfig
 ---@field keymaps Dbab.Keymaps
 ---@field highlights? table<string, table> Highlight group overrides (nvim_set_hl opts)
 
@@ -28,6 +27,7 @@
 ---@field use_brand_icon boolean Use per-DB brand icons (default false, uses generic db icon)
 ---@field use_brand_color boolean Use per-DB brand colors for icons (default false)
 ---@field show_brand_name boolean Show DB type label like [postgres] (default false)
+---@field show_system_schemas boolean Show system schemas (pg_catalog, information_schema)
 
 ---@class Dbab.EditorConfig
 ---@field show_tabbar boolean Show tab bar above editor (default true)
@@ -41,8 +41,6 @@
 ---@field header_align Dbab.HeaderAlign Winbar metadata alignment ("fit" = align to grid, "full" = align to window edge)
 ---@field style? Dbab.ResultStyle Result display style
 
----@class Dbab.SchemaConfig
----@field show_system_schemas boolean Show system schemas (pg_catalog, information_schema)
 
 ---@alias Dbab.HistoryField "icon"|"time"|"dbname"|"query"|"duration"
 
@@ -110,7 +108,6 @@
 ---@alias DbabConfig Dbab.Config
 ---@alias DbabConnection Dbab.Connection
 ---@alias DbabGridConfig Dbab.ResultConfig
----@alias DbabSchemaConfig Dbab.SchemaConfig
 ---@alias DbabHistoryConfig Dbab.HistoryConfig
 ---@alias DbabHistoryEntry Dbab.HistoryEntry
 ---@alias DbabKeymaps Dbab.Keymaps

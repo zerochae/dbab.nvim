@@ -32,6 +32,7 @@ M.defaults = {
     use_brand_icon = false,
     use_brand_color = false,
     show_brand_name = false,
+    show_system_schemas = true,
   },
   editor = {
     show_tabbar = true,
@@ -53,9 +54,6 @@ M.defaults = {
     format = nil,
     query_display = "auto",
     short_hints = { "where", "join", "order", "group", "limit" },
-  },
-  schema = {
-    show_system_schemas = true,
   },
   keymaps = {
     open = "<Leader>db",
@@ -110,11 +108,11 @@ M.defaults = {
 ---@type Dbab.Config|nil
 M.options = nil
 
+M._has_legacy_config = false
+
 --- Migrate legacy ui.* config to flat structure
 ---@param opts table
 ---@return table
-M._has_legacy_config = false
-
 local function migrate_legacy(opts)
   if not opts.ui then
     return opts
@@ -153,6 +151,10 @@ function M.setup(opts)
   if user_opts.grid and not user_opts.result then
     user_opts.result = user_opts.grid
     user_opts.grid = nil
+  end
+  if user_opts.schema then
+    user_opts.sidebar = vim.tbl_deep_extend("force", user_opts.sidebar or {}, user_opts.schema)
+    user_opts.schema = nil
   end
   M.options = vim.tbl_deep_extend("force", {}, M.defaults, user_opts)
   M._apply_layout_preset()

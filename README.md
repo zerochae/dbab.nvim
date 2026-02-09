@@ -163,6 +163,7 @@ require("dbab").setup({
     use_brand_icon = false,   -- true: per-DB icons, false: generic db icon
     use_brand_color = false,  -- true: per-DB brand colors, false: single color (Number)
     show_brand_name = false,  -- true: show [postgres] label, false: icon + name only
+    show_system_schemas = true,
   },
   editor = {
     show_tabbar = true,       -- show tab bar above editor
@@ -183,9 +184,6 @@ require("dbab").setup({
     filter_by_connection = true,
     query_display = "auto",   -- "short", "full", or "auto"
     short_hints = { "where", "join", "order", "group", "limit" },
-  },
-  schema = {
-    show_system_schemas = true,
   },
   keymaps = {
     open = "<Leader>db",
@@ -270,7 +268,7 @@ Configure with `result.style`:
 
 | Style | Description |
 |-------|-------------|
-| `"table"` | Table grid with zebra striping and type-aware highlighting (default) |
+| `"table"` | Table with zebra striping and type-aware highlighting (default) |
 | `"json"` | JSON format with Treesitter syntax highlighting |
 | `"vertical"` | One record per block, column names on the left (like `psql \x`) |
 | `"markdown"` | Markdown table with Treesitter syntax highlighting |
@@ -341,14 +339,14 @@ sidebar = {
 All highlight groups can be overridden by defining them before `setup()`.
 Groups marked with **(computed)** are always recalculated based on your colorscheme.
 
-### Grid
+### Result
 
 | Group | Default | Description |
 |-------|---------|-------------|
 | `DbabRowOdd` | **(computed)** | Odd row background |
 | `DbabRowEven` | **(computed)** | Even row background |
-| `DbabHeader` | **(computed)** | Grid header (from `Function` fg) |
-| `DbabSeparator` | `Comment` | Grid separator lines |
+| `DbabHeader` | **(computed)** | Result header (from `Function` fg) |
+| `DbabSeparator` | `Comment` | Result separator lines |
 | `DbabCellActive` | `CursorLine` | Active cell |
 
 ### Window
