@@ -46,7 +46,7 @@ A lightweight database client for Neovim. Query databases directly from your edi
 - Neovim >= 0.9.0
 - Database CLI tools:
   - `psql` for PostgreSQL
-  - `mysql` for MySQL
+  - `mysql` for MySQL/MariaDB
   - `sqlite3` for SQLite
 - [nui.nvim](https://github.com/MunifTanjim/nui.nvim)
 - [vim-dadbod](https://github.com/tpope/vim-dadbod) (optional: for `executor = "dadbod"`)
@@ -483,7 +483,7 @@ This project was inspired by excellent existing plugins:
 - [vim-dadbod-ui](https://github.com/kristijanhusak/vim-dadbod-ui): The classic DB UI for Vim/Neovim.
 - [nvim-dbee](https://github.com/kndndrj/nvim-dbee): A modern approach to DB client in Neovim.
 
-`dbab.nvim` aims to provide a lightweight alternative with a modern Lua-based UI while leveraging the robust backend of [vim-dadbod](https://github.com/tpope/vim-dadbod).
+`dbab.nvim` aims to provide a lightweight, self-contained alternative with a modern Lua-based UI. It can optionally integrate with [vim-dadbod](https://github.com/tpope/vim-dadbod) via `executor = "dadbod"`.
 
 ## License
 
