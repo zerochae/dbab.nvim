@@ -232,6 +232,10 @@ require("dbab").setup({
     query_display = "auto",         -- "short", "full", or "auto"
     short_hints = { "where", "join", "order", "group", "limit" },
   },
+  highlights = {
+    -- Override any Dbab highlight group
+    -- DbabHeader = { bg = "#ff6600", fg = "#000000" },
+  },
 })
 ```
 
@@ -428,13 +432,15 @@ Hint badges (compact mode):
 
 ### Customization
 
-Override highlights before calling `setup()`:
+Override highlights via `setup()`:
 
 ```lua
-vim.api.nvim_set_hl(0, "DbabHeader", { bg = "#ff6600", fg = "#000000" })
-vim.api.nvim_set_hl(0, "DbabNull", { fg = "#555555", italic = true })
-
-require("dbab").setup({ ... })
+require("dbab").setup({
+  highlights = {
+    DbabHeader = { bg = "#ff6600", fg = "#000000" },
+    DbabNull = { fg = "#555555", italic = true },
+  },
+})
 ```
 
 ## Connection URL Format

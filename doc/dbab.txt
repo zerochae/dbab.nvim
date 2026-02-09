@@ -198,6 +198,15 @@ history ~
     - `query_display`: How to display query - "short", "full", "auto" (default: "auto")
     - `short_hints`: Hints to show in short mode (default: {"where","join","order","group","limit"})
 
+                                                        *dbab-config-highlights*
+highlights ~
+    Highlight group overrides.
+    Type: `table<string, vim.api.keyset.highlight>`
+    Default: `{}`
+
+    Override any Dbab highlight group. Applied after all defaults, so these
+    always take priority. See |dbab-highlights| for available groups.
+
 Example configuration: >lua
     require("dbab").setup({
       connections = {
@@ -229,6 +238,9 @@ Example configuration: >lua
         filter_by_connection = true,
         query_display = "auto",
         short_hints = { "where", "join", "order", "group", "limit" },
+      },
+      highlights = {
+        DbabHeader = { bg = "#ff6600", fg = "#000000" },
       },
     })
 <
@@ -395,12 +407,13 @@ TAB BAR                                              *dbab-highlights-tabbar*
 
 CUSTOMIZATION EXAMPLE                          *dbab-highlights-customization*
 
-Override highlights before setup: >lua
-    -- Custom highlight overrides
-    vim.api.nvim_set_hl(0, "DbabHeader", { bg = "#ff6600", fg = "#000000" })
-    vim.api.nvim_set_hl(0, "DbabNull", { fg = "#555555", italic = true })
-
-    require("dbab").setup({ ... })
+Override highlights via setup: >lua
+    require("dbab").setup({
+      highlights = {
+        DbabHeader = { bg = "#ff6600", fg = "#000000" },
+        DbabNull = { fg = "#555555", italic = true },
+      },
+    })
 <
 
 ==============================================================================

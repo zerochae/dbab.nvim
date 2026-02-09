@@ -109,6 +109,7 @@ M.defaults = {
     query_display = "auto", -- "short" = "SEL users", "full" = full query with syntax highlight, "auto" = full if fits
     short_hints = { "where", "join", "order", "group", "limit" }, -- hints: ? WHERE, ⋈ JOIN, ↑↓ ORDER, ⊞ GROUP, ↓N LIMIT
   },
+  highlights = {},
 }
 
 ---@type Dbab.Config|nil

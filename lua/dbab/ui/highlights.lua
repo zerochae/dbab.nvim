@@ -139,9 +139,15 @@ function M.setup()
   }
 
   for name, opts in pairs(highlights) do
-    -- 기존 하이라이트가 없을 때만 설정
     local existing = vim.api.nvim_get_hl(0, { name = name })
     if vim.tbl_isempty(existing) then
+      vim.api.nvim_set_hl(0, name, opts)
+    end
+  end
+
+  local cfg = require("dbab.config").get()
+  if cfg.highlights then
+    for name, opts in pairs(cfg.highlights) do
       vim.api.nvim_set_hl(0, name, opts)
     end
   end
