@@ -48,8 +48,9 @@ Layout Presets: >
 REQUIREMENTS                                                *dbab-requirements*
 
 - Neovim >= 0.9.0
+- vim-dadbod (https://github.com/tpope/vim-dadbod)
 - nui.nvim (https://github.com/MunifTanjim/nui.nvim)
-- nvim-cmp (optional, for autocompletion)
+- nvim-cmp (https://github.com/hrsh7th/nvim-cmp) (optional, for autocompletion)
 - Database CLI tools:
   - `psql` for PostgreSQL
   - `mysql` for MySQL/MariaDB
@@ -61,7 +62,7 @@ INSTALLATION                                                *dbab-installation*
 Using lazy.nvim: >lua
     {
       "zerochae/dbab.nvim",
-      dependencies = { "MunifTanjim/nui.nvim" },
+      dependencies = { "tpope/vim-dadbod", "MunifTanjim/nui.nvim" },
       config = function()
         require("dbab").setup({
           connections = {
