@@ -16,10 +16,10 @@ CONTENTS                                                        *dbab-contents*
 INTRODUCTION                                                *dbab-introduction*
 
 dbab.nvim is a lightweight database client for Neovim. Query PostgreSQL,
-MySQL, and SQLite databases directly from your editor.
+MySQL, MariaDB, and SQLite databases directly from your editor.
 
 Features:
-- Multi-database support (PostgreSQL, MySQL, SQLite)
+- Multi-database support (PostgreSQL, MySQL, MariaDB, SQLite)
 - Flexible layout with presets or custom configuration
 - Schema browser with sidebar navigation
 - Query history with timing and re-execution
@@ -52,7 +52,7 @@ REQUIREMENTS                                                *dbab-requirements*
 - nvim-cmp (optional, for autocompletion)
 - Database CLI tools:
   - `psql` for PostgreSQL
-  - `mysql` for MySQL
+  - `mysql` for MySQL/MariaDB
   - `sqlite3` for SQLite
 
 ==============================================================================
@@ -99,37 +99,71 @@ connections ~
     - `name`: Display name for the connection
     - `url`: Database connection URL (supports env vars like `$DATABASE_URL`)
 
-                                                                *dbab-config-ui*
-ui ~
-    UI configuration.
-    Type: `Dbab.UIConfig`
+                                                            *dbab-config-layout*
+layout ~
+    Layout preset or custom layout array.
+    Type: `Dbab.Layout`
+    Default: `"classic"`
 
-    ui.layout ~
-        Layout preset or custom layout array.
-        - `"classic"`: 4-pane layout (default)
-        - `"wide"`: 3-column top + full-width bottom
-        - Custom: Array of rows, e.g., `{ { "sidebar", "editor" }, { "grid" } }`
+    - `"classic"`: 4-pane layout (default)
+    - `"wide"`: 3-column top + full-width bottom
+    - Custom: Array of rows, e.g., `{ { "sidebar", "editor" }, { "grid" } }`
 
-    ui.sidebar ~
-        - `width`: Sidebar width ratio 0.1~1.0 (default: 0.2)
+                                                           *dbab-config-sidebar*
+sidebar ~
+    Sidebar configuration.
+    Type: `Dbab.SidebarConfig`
 
-    ui.history ~
-        - `width`: History width ratio 0.1~1.0 (default: 0.2)
-        - `style`: History display style (default: "compact")
-            - `"compact"`: One line per entry
-            - `"detailed"`: Multi-line with full query and metadata
+    - `width`: Sidebar width ratio 0.1~1.0 (default: 0.2)
+    - `use_brand_icon`: Use per-DB brand icons (default: false)
+    - `use_brand_color`: Use per-DB brand colors (default: false)
+    - `show_brand_name`: Show DB type label like [postgres] (default: false)
 
-    ui.grid ~
-        - `max_width`: Maximum grid width (default: 120)
-        - `max_height`: Maximum grid height (default: 20)
-        - `show_line_number`: Show line numbers (default: true)
-        - `header_align`: Winbar alignment - "fit" or "full" (default: "fit")
-        - `style`: Result display style (default: "table")
-            - `"table"`: Table grid with zebra striping
-            - `"json"`: JSON syntax highlighting
-            - `"raw"`: Raw CLI output
-            - `"vertical"`: One column per line (like psql \x)
-            - `"markdown"`: Markdown table
+                                                            *dbab-config-editor*
+editor ~
+    Editor configuration.
+    Type: `Dbab.EditorConfig`
+
+    - `show_tabbar`: Show tab bar above editor (default: true)
+
+                                                              *dbab-config-grid*
+grid ~
+    Result grid configuration.
+    Type: `Dbab.GridConfig`
+
+    - `max_width`: Maximum grid width (default: 120)
+    - `max_height`: Maximum grid height (default: 20)
+    - `show_line_number`: Show line numbers (default: true)
+    - `header_align`: Winbar alignment - "fit" or "full" (default: "fit")
+    - `style`: Result display style (default: "table")
+        - `"table"`: Table grid with zebra striping
+        - `"json"`: JSON syntax highlighting
+        - `"raw"`: Raw CLI output
+        - `"vertical"`: One column per line (like psql \x)
+        - `"markdown"`: Markdown table
+
+                                                           *dbab-config-history*
+history ~
+    History configuration.
+    Type: `Dbab.HistoryConfig`
+
+    - `width`: History width ratio 0.1~1.0 (default: 0.2)
+    - `style`: History display style (default: "compact")
+        - `"compact"`: One line per entry
+        - `"detailed"`: Multi-line with full query and metadata
+    - `max_entries`: Maximum history entries (default: 100)
+    - `on_select`: Action on Enter key - "execute" or "load" (default: "execute")
+    - `persist`: Save history to disk (default: true)
+    - `filter_by_connection`: Filter by current connection (default: true)
+    - `query_display`: How to display query - "short", "full", "auto" (default: "auto")
+    - `short_hints`: Hints to show in short mode (default: {"where","join","order","group","limit"})
+
+                                                            *dbab-config-schema*
+schema ~
+    Schema display configuration.
+    Type: `Dbab.SchemaConfig`
+
+    - `show_system_schemas`: Show system schemas (default: true)
 
                                                            *dbab-config-keymaps*
 keymaps ~
@@ -179,25 +213,6 @@ keymaps ~
     - `result.to_sidebar`: Move focus to sidebar (default: "<Tab>")
     - `result.to_editor`: Move focus to editor (default: "<S-Tab>")
 
-                                                            *dbab-config-schema*
-schema ~
-    Schema display configuration.
-    Type: `Dbab.SchemaConfig`
-
-    - `show_system_schemas`: Show system schemas (default: true)
-
-                                                           *dbab-config-history*
-history ~
-    History panel configuration.
-    Type: `Dbab.HistoryConfig`
-
-    - `max_entries`: Maximum history entries (default: 100)
-    - `on_select`: Action on Enter key - "execute" or "load" (default: "execute")
-    - `persist`: Save history to disk (default: true)
-    - `filter_by_connection`: Filter by current connection (default: true)
-    - `query_display`: How to display query - "short", "full", "auto" (default: "auto")
-    - `short_hints`: Hints to show in short mode (default: {"where","join","order","group","limit"})
-
                                                         *dbab-config-highlights*
 highlights ~
     Highlight group overrides.
@@ -213,16 +228,31 @@ Example configuration: >lua
         { name = "local", url = "postgres://localhost/mydb" },
         { name = "prod", url = "$DATABASE_URL" },
       },
-      ui = {
-        layout = "classic",  -- "classic", "wide", or custom array
-        sidebar = { width = 0.2 },
-        history = { width = 0.2 },
-        grid = {
-          max_width = 120,
-          max_height = 20,
-          show_line_number = true,
-          header_align = "fit",
-        },
+      layout = "classic",
+      sidebar = {
+        width = 0.2,
+        use_brand_icon = true,
+        show_brand_name = true,
+      },
+      editor = {
+        show_tabbar = true,
+      },
+      grid = {
+        max_width = 120,
+        max_height = 20,
+        show_line_number = true,
+        header_align = "fit",
+        style = "table",
+      },
+      history = {
+        width = 0.2,
+        style = "compact",
+        max_entries = 100,
+        on_select = "execute",
+        persist = true,
+        filter_by_connection = true,
+        query_display = "auto",
+        short_hints = { "where", "join", "order", "group", "limit" },
       },
       keymaps = {
         open = "<Leader>db",
@@ -231,14 +261,6 @@ Example configuration: >lua
       schema = {
         show_system_schemas = true,
       },
-      history = {
-        max_entries = 100,
-        on_select = "execute",
-        persist = true,
-        filter_by_connection = true,
-        query_display = "auto",
-        short_hints = { "where", "join", "order", "group", "limit" },
-      },
       highlights = {
         DbabHeader = { bg = "#ff6600", fg = "#000000" },
       },
@@ -246,12 +268,9 @@ Example configuration: >lua
 <
 
 Custom layout example: >lua
-    -- No history panel
-    ui = {
-      layout = {
-        { "sidebar", "editor" },
-        { "grid" },
-      },
+    layout = {
+      { "sidebar", "editor" },
+      { "grid" },
     }
 <
 
@@ -349,6 +368,15 @@ SCHEMA                                                *dbab-highlights-schema*
 
 SIDEBAR                                              *dbab-highlights-sidebar*
 
+    DB brand icons:
+    `DbabIconDb`              Default DB icon color         Number
+    `DbabIconPostgres`        PostgreSQL brand color        fg=#4169E1 (bold)
+    `DbabIconMysql`           MySQL brand color             fg=#4479A1 (bold)
+    `DbabIconMariadb`         MariaDB brand color           fg=#003545 (bold)
+    `DbabIconSqlite`          SQLite brand color            fg=#003B57 (bold)
+    `DbabIconRedis`           Redis brand color             fg=#FF4438 (bold)
+    `DbabIconMongodb`         MongoDB brand color           fg=#47A248 (bold)
+
     Icon colors:
     `DbabSidebarIconConnection`   Connection icon           Number
     `DbabSidebarIconActive`       Active connection icon    String
@@ -424,7 +452,8 @@ All type definitions are in `lua/dbab/types.lua`.
                                                                  *Dbab.Config*
 Dbab.Config ~
     Main configuration type.
-    Fields: `connections`, `ui`, `keymaps`, `schema`
+    Fields: `connections`, `layout`, `sidebar`, `editor`, `grid`,
+            `history`, `schema`, `keymaps`, `highlights`
 
                                                              *Dbab.Connection*
 Dbab.Connection ~
@@ -459,8 +488,8 @@ Dbab.HistoryEntry ~
                                                           *Dbab.HistoryConfig*
 Dbab.HistoryConfig ~
     History configuration.
-    Fields: `max_entries`, `on_select`, `persist`, `filter_by_connection`,
-            `query_display`, `short_hints`
+    Fields: `width`, `style`, `max_entries`, `on_select`, `persist`,
+            `filter_by_connection`, `query_display`, `short_hints`
 
                                                                  *Dbab.Layout*
 Dbab.Layout ~
