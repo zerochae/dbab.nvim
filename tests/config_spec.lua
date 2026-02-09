@@ -11,13 +11,25 @@ describe("config", function()
       assert.are.equal(0, #config.defaults.connections)
     end)
 
-    it("has UI configuration", function()
-      assert.is_not_nil(config.defaults.ui)
-      assert.is_not_nil(config.defaults.ui.grid)
+    it("has grid configuration", function()
+      assert.is_not_nil(config.defaults.grid)
+      assert.is_not_nil(config.defaults.grid.style)
+      assert.are.equal("table", config.defaults.grid.style)
+    end)
 
-      -- Grid style option
-      assert.is_not_nil(config.defaults.ui.grid.style)
-      assert.are.equal("table", config.defaults.ui.grid.style)
+    it("has sidebar configuration", function()
+      assert.is_not_nil(config.defaults.sidebar)
+      assert.are.equal(0.2, config.defaults.sidebar.width)
+    end)
+
+    it("has editor configuration", function()
+      assert.is_not_nil(config.defaults.editor)
+      assert.is_true(config.defaults.editor.show_tabbar)
+    end)
+
+    it("has history configuration", function()
+      assert.is_not_nil(config.defaults.history)
+      assert.are.equal("compact", config.defaults.history.style)
     end)
 
     it("has keymaps configuration", function()
@@ -58,23 +70,32 @@ describe("config", function()
       local opts = config.get()
       assert.are.equal(1, #opts.connections)
       assert.are.equal("mydb", opts.connections[1].name)
-      -- Defaults should still be present
-      assert.is_not_nil(opts.ui.grid.max_width)
+      assert.is_not_nil(opts.grid.max_width)
     end)
 
     it("allows overriding nested options", function()
       config.setup({
-        ui = {
-          grid = {
-            max_width = 80,
-          },
+        grid = {
+          max_width = 80,
         },
       })
 
       local opts = config.get()
-      assert.are.equal(80, opts.ui.grid.max_width)
-      -- Other defaults should be preserved
-      assert.is_not_nil(opts.ui.grid.max_height)
+      assert.are.equal(80, opts.grid.max_width)
+      assert.is_not_nil(opts.grid.max_height)
+    end)
+
+    it("migrates legacy ui.* config", function()
+      config.setup({
+        ui = {
+          layout = "wide",
+          grid = { max_width = 80 },
+        },
+      })
+
+      local opts = config.get()
+      assert.are.equal(80, opts.grid.max_width)
+      assert.is_true(config._has_legacy_config)
     end)
 
     it("works with empty options", function()
