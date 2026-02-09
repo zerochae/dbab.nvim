@@ -48,8 +48,9 @@ A lightweight database client for Neovim. Query databases directly from your edi
   - `psql` for PostgreSQL
   - `mysql` for MySQL
   - `sqlite3` for SQLite
-- [vim-dadbod](https://github.com/tpope/vim-dadbod)
 - [nui.nvim](https://github.com/MunifTanjim/nui.nvim)
+- [vim-dadbod](https://github.com/tpope/vim-dadbod) (optional: for `executor = "dadbod"`)
+- [plenary.nvim](https://github.com/nvim-lua/plenary.nvim) (optional: for async execution)
 
 ## Installation
 
@@ -59,9 +60,10 @@ A lightweight database client for Neovim. Query databases directly from your edi
 {
   "zerochae/dbab.nvim",
   dependencies = {
-    "tpope/vim-dadbod",
     "MunifTanjim/nui.nvim",
-    "hrsh7th/nvim-cmp", -- Optional: for autocompletion
+    "nvim-lua/plenary.nvim",       -- Optional: for async execution
+    "tpope/vim-dadbod",            -- Optional: for executor = "dadbod"
+    "hrsh7th/nvim-cmp",            -- Optional: for autocompletion
   },
   config = function()
     require("dbab").setup({
@@ -159,6 +161,7 @@ require("dbab").setup({
   connections = {
     { name = "local", url = "postgres://localhost/mydb" },
   },
+  executor = "cli",    -- "cli" (self-contained) | "dadbod" (requires vim-dadbod)
   layout = "classic",  -- "classic" | "wide" | custom layout table
   sidebar = {
     width = 0.2,
@@ -377,7 +380,7 @@ Groups marked with **(computed)** are always recalculated based on your colorsch
 |-------|---------|-------------|
 | `DbabTable` | `Type` | Table names |
 | `DbabKey` | `Keyword` | Key names |
-| `DbabPK` | `DiagnosticError` | Primary key (bold) |
+| `DbabPK` | `ErrorMsg` | Primary key (bold) |
 | `DbabFK` | `Function` | Foreign key (bold) |
 
 ### Sidebar
@@ -400,7 +403,7 @@ Groups marked with **(computed)** are always recalculated based on your colorsch
 | `DbabSidebarIconSchema` | `Type` | Schema icon |
 | `DbabSidebarIconTable` | `Type` | Table icon |
 | `DbabSidebarIconColumn` | `Function` | Column icon |
-| `DbabSidebarIconPK` | `DiagnosticError` | Primary key icon |
+| `DbabSidebarIconPK` | `ErrorMsg` | Primary key icon |
 | `DbabSidebarText` | `Normal` | Default text |
 | `DbabSidebarTextActive` | `String` | Active item text (bold) |
 | `DbabSidebarType` | `Comment` | Type annotation |
@@ -420,17 +423,17 @@ Groups marked with **(computed)** are always recalculated based on your colorsch
 | `DbabHistorySelect` | `Function` | SELECT queries |
 | `DbabHistoryInsert` | `String` | INSERT queries |
 | `DbabHistoryUpdate` | `Type` | UPDATE queries |
-| `DbabHistoryDelete` | `DiagnosticError` | DELETE queries |
+| `DbabHistoryDelete` | `ErrorMsg` | DELETE queries |
 | `DbabHistoryCreate` | `String` | CREATE statements |
-| `DbabHistoryDrop` | `DiagnosticError` | DROP statements |
+| `DbabHistoryDrop` | `ErrorMsg` | DROP statements |
 | `DbabHistoryAlter` | `Special` | ALTER statements |
-| `DbabHistoryTruncate` | `DiagnosticWarn` | TRUNCATE statements |
+| `DbabHistoryTruncate` | `WarningMsg` | TRUNCATE statements |
 
 Hint badges (compact mode):
 
 | Group | Default | Description |
 |-------|---------|-------------|
-| `DbabHistoryHintWhere` | `DiagnosticWarn` | WHERE clause |
+| `DbabHistoryHintWhere` | `WarningMsg` | WHERE clause |
 | `DbabHistoryHintJoin` | `Special` | JOIN clause |
 | `DbabHistoryHintOrder` | `Keyword` | ORDER BY |
 | `DbabHistoryHintGroup` | `Type` | GROUP BY |
@@ -444,7 +447,7 @@ Hint badges (compact mode):
 | `DbabTabActiveIcon` | `bg=#3a3a4a fg=#a6e3a1` | Active tab icon |
 | `DbabTabInactive` | `Comment` | Inactive tab |
 | `DbabTabInactiveIcon` | `Comment` | Inactive tab icon |
-| `DbabTabModified` | `DiagnosticWarn` | Modified indicator |
+| `DbabTabModified` | `WarningMsg` | Modified indicator |
 | `DbabTabIconSaved` | `String` | Saved query icon |
 | `DbabTabIconUnsaved` | `Function` | Unsaved query icon |
 | `DbabTabbarBg` | `Normal` | Tab bar background |

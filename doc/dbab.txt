@@ -48,8 +48,9 @@ Layout Presets: >
 REQUIREMENTS                                                *dbab-requirements*
 
 - Neovim >= 0.9.0
-- vim-dadbod (https://github.com/tpope/vim-dadbod)
 - nui.nvim (https://github.com/MunifTanjim/nui.nvim)
+- vim-dadbod (https://github.com/tpope/vim-dadbod) (optional, for `executor = "dadbod"`)
+- plenary.nvim (https://github.com/nvim-lua/plenary.nvim) (optional, for async execution)
 - nvim-cmp (https://github.com/hrsh7th/nvim-cmp) (optional, for autocompletion)
 - Database CLI tools:
   - `psql` for PostgreSQL
@@ -62,7 +63,7 @@ INSTALLATION                                                *dbab-installation*
 Using lazy.nvim: >lua
     {
       "zerochae/dbab.nvim",
-      dependencies = { "tpope/vim-dadbod", "MunifTanjim/nui.nvim" },
+      dependencies = { "MunifTanjim/nui.nvim" },
       config = function()
         require("dbab").setup({
           connections = {
@@ -99,6 +100,15 @@ connections ~
     Each connection has:
     - `name`: Display name for the connection
     - `url`: Database connection URL (supports env vars like `$DATABASE_URL`)
+
+                                                          *dbab-config-executor*
+executor ~
+    Executor backend for running queries.
+    Type: `Dbab.ExecutorBackend`
+    Default: `"cli"`
+
+    - `"cli"`: Self-contained, calls psql/mysql/sqlite3 directly (default)
+    - `"dadbod"`: Uses vim-dadbod (requires tpope/vim-dadbod plugin)
 
                                                             *dbab-config-layout*
 layout ~
@@ -223,6 +233,7 @@ Example configuration: >lua
         { name = "local", url = "postgres://localhost/mydb" },
         { name = "prod", url = "$DATABASE_URL" },
       },
+      executor = "cli",
       layout = "classic",
       sidebar = {
         width = 0.2,
@@ -355,7 +366,7 @@ SCHEMA                                                *dbab-highlights-schema*
 
     `DbabTable`         Table names                         Type
     `DbabKey`           Key names                           Keyword
-    `DbabPK`            Primary key indicator               DiagnosticError
+    `DbabPK`            Primary key indicator               ErrorMsg
     `DbabFK`            Foreign key indicator               Function
 
 SIDEBAR                                              *dbab-highlights-sidebar*
@@ -379,7 +390,7 @@ SIDEBAR                                              *dbab-highlights-sidebar*
     `DbabSidebarIconSchema`       Schema icon               Type
     `DbabSidebarIconTable`        Table icon                Type
     `DbabSidebarIconColumn`       Column icon               Function
-    `DbabSidebarIconPK`           Primary key icon          DiagnosticError
+    `DbabSidebarIconPK`           Primary key icon          ErrorMsg
 
     Text:
     `DbabSidebarText`             Default text              Normal
@@ -401,14 +412,14 @@ HISTORY                                              *dbab-highlights-history*
     `DbabHistorySelect`           SELECT queries            Function
     `DbabHistoryInsert`           INSERT queries            String
     `DbabHistoryUpdate`           UPDATE queries            Type
-    `DbabHistoryDelete`           DELETE queries            DiagnosticError
+    `DbabHistoryDelete`           DELETE queries            ErrorMsg
     `DbabHistoryCreate`           CREATE statements         String
-    `DbabHistoryDrop`             DROP statements           DiagnosticError
+    `DbabHistoryDrop`             DROP statements           ErrorMsg
     `DbabHistoryAlter`            ALTER statements          Special
-    `DbabHistoryTruncate`         TRUNCATE statements       DiagnosticWarn
+    `DbabHistoryTruncate`         TRUNCATE statements       WarningMsg
 
     Hint badges (compact mode):
-    `DbabHistoryHintWhere`        WHERE clause hint         DiagnosticWarn
+    `DbabHistoryHintWhere`        WHERE clause hint         WarningMsg
     `DbabHistoryHintJoin`         JOIN clause hint          Special
     `DbabHistoryHintOrder`        ORDER BY hint             Keyword
     `DbabHistoryHintGroup`        GROUP BY hint             Type
@@ -420,7 +431,7 @@ TAB BAR                                              *dbab-highlights-tabbar*
     `DbabTabActiveIcon`           Active tab icon           bg=#3a3a4a fg=#a6e3a1
     `DbabTabInactive`             Inactive tab              Comment
     `DbabTabInactiveIcon`         Inactive tab icon         Comment
-    `DbabTabModified`             Modified indicator        DiagnosticWarn
+    `DbabTabModified`             Modified indicator        WarningMsg
     `DbabTabIconSaved`            Saved query icon          String
     `DbabTabIconUnsaved`          Unsaved query icon        Function
     `DbabTabbarBg`                Tab bar background        Normal
@@ -444,8 +455,8 @@ All type definitions are in `lua/dbab/types.lua`.
                                                                  *Dbab.Config*
 Dbab.Config ~
     Main configuration type.
-    Fields: `connections`, `layout`, `sidebar`, `editor`, `result`,
-            `history`, `keymaps`, `highlights`
+    Fields: `connections`, `executor`, `layout`, `sidebar`, `editor`,
+            `result`, `history`, `keymaps`, `highlights`
 
                                                              *Dbab.Connection*
 Dbab.Connection ~

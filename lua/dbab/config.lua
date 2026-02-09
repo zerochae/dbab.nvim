@@ -26,6 +26,7 @@ M.layout_presets = {
 ---@type Dbab.Config
 M.defaults = {
   connections = {},
+  executor = "cli",
   layout = "classic",
   sidebar = {
     width = 0.2,
@@ -118,6 +119,7 @@ local function migrate_legacy(opts)
     return opts
   end
 
+  vim.notify("[dbab] 'ui.*' config is deprecated. Use flat config instead.", vim.log.levels.WARN)
   M._has_legacy_config = true
   local ui = opts.ui
   opts.ui = nil
@@ -148,11 +150,15 @@ end
 function M.setup(opts)
   local user_opts = opts or {}
   user_opts = migrate_legacy(user_opts)
-  if user_opts.grid and not user_opts.result then
-    user_opts.result = user_opts.grid
+  if user_opts.grid then
+    vim.notify("[dbab] 'grid' is deprecated, use 'result' instead.", vim.log.levels.WARN)
+    if not user_opts.result then
+      user_opts.result = user_opts.grid
+    end
     user_opts.grid = nil
   end
   if user_opts.schema then
+    vim.notify("[dbab] 'schema' is deprecated, use 'sidebar' instead.", vim.log.levels.WARN)
     user_opts.sidebar = vim.tbl_deep_extend("force", user_opts.sidebar or {}, user_opts.schema)
     user_opts.schema = nil
   end

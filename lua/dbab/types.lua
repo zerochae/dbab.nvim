@@ -6,8 +6,11 @@
 --- Configuration Types
 ---============================================================================
 
+---@alias Dbab.ExecutorBackend "cli"|"dadbod"
+
 ---@class Dbab.Config
 ---@field connections Dbab.Connection[]
+---@field executor Dbab.ExecutorBackend Executor backend ("cli" = self-contained, "dadbod" = vim-dadbod)
 ---@field layout Dbab.Layout Declarative layout configuration
 ---@field sidebar Dbab.SidebarConfig
 ---@field editor Dbab.EditorConfig
