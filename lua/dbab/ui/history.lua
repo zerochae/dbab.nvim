@@ -695,7 +695,7 @@ function M.render()
     table.insert(lines, empty_msg)
     table.insert(highlights, { line = 0, hl = "Comment", col_start = 0, col_end = -1 })
   else
-    local style = cfg.ui.history.style or "compact"
+    local style = cfg.history.style or "compact"
     local render_lines, render_highlights, line_map
 
     if style == "detailed" then

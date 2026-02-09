@@ -8,10 +8,13 @@
 
 ---@class Dbab.Config
 ---@field connections Dbab.Connection[]
----@field ui Dbab.UIConfig
----@field keymaps Dbab.Keymaps
----@field schema Dbab.SchemaConfig
+---@field layout Dbab.Layout Declarative layout configuration
+---@field sidebar Dbab.SidebarConfig
+---@field editor Dbab.EditorConfig
+---@field grid Dbab.GridConfig
 ---@field history Dbab.HistoryConfig
+---@field schema Dbab.SchemaConfig
+---@field keymaps Dbab.Keymaps
 ---@field highlights? table<string, table> Highlight group overrides (nvim_set_hl opts)
 
 ---@class Dbab.Connection
@@ -20,25 +23,14 @@
 
 ---@alias Dbab.ResultStyle "table"|"json"|"raw"|"vertical"|"markdown"
 
----@class Dbab.UIConfig
----@field layout Dbab.Layout Declarative layout configuration
----@field editor Dbab.EditorUIConfig
----@field grid Dbab.GridConfig
----@field sidebar Dbab.SidebarUIConfig
----@field history Dbab.HistoryUIConfig
-
----@class Dbab.EditorUIConfig
----@field show_tabbar boolean Show tab bar above editor (default true)
-
----@class Dbab.SidebarUIConfig
+---@class Dbab.SidebarConfig
 ---@field width number Width as percentage (0.1~1.0)
 ---@field use_brand_icon boolean Use per-DB brand icons (default false, uses generic db icon)
 ---@field use_brand_color boolean Use per-DB brand colors for icons (default false)
 ---@field show_brand_name boolean Show DB type label like [postgres] (default false)
 
----@class Dbab.HistoryUIConfig
----@field width number Width as percentage (0.1~1.0)
----@field style? "compact"|"detailed" History display style (default "compact")
+---@class Dbab.EditorConfig
+---@field show_tabbar boolean Show tab bar above editor (default true)
 
 ---@alias Dbab.HeaderAlign "fit"|"full"
 
@@ -47,7 +39,7 @@
 ---@field max_height number Maximum grid height
 ---@field show_line_number boolean Show line numbers in result grid
 ---@field header_align Dbab.HeaderAlign Winbar metadata alignment ("fit" = align to grid, "full" = align to window edge)
----@field style? Dbab.ResultStyle Result display style ("table" = table grid, "json" = JSON, "raw" = plain text, "vertical" = record per line, "markdown" = markdown table)
+---@field style? Dbab.ResultStyle Result display style
 
 ---@class Dbab.SchemaConfig
 ---@field show_system_schemas boolean Show system schemas (pg_catalog, information_schema)
@@ -57,13 +49,15 @@
 ---@alias Dbab.ShortHint "where"|"join"|"order"|"group"|"limit"
 
 ---@class Dbab.HistoryConfig
+---@field width number Width as percentage (0.1~1.0)
+---@field style? "compact"|"detailed" History display style (default "compact")
 ---@field max_entries number Maximum history entries (default 100)
 ---@field on_select "execute"|"load" Action when selecting history item
 ---@field persist boolean Whether to persist history to disk
 ---@field filter_by_connection boolean Filter history by current connection (default true)
 ---@field format? Dbab.HistoryField[] Fields to show and their order (nil = auto based on filter_by_connection)
----@field query_display "short"|"full"|"auto" How to display query ("short" = summary, "full" = full query with syntax highlight, "auto" = full if fits, else short)
----@field short_hints? Dbab.ShortHint[] Hints to show in short mode (nil = none, e.g., {"where", "join", "limit"})
+---@field query_display "short"|"full"|"auto" How to display query
+---@field short_hints? Dbab.ShortHint[] Hints to show in short mode
 
 ---@class Dbab.Keymaps
 ---@field open string Keymap to open dbab
@@ -115,7 +109,6 @@
 -- Aliases for backward compatibility
 ---@alias DbabConfig Dbab.Config
 ---@alias DbabConnection Dbab.Connection
----@alias DbabUIConfig Dbab.UIConfig
 ---@alias DbabGridConfig Dbab.GridConfig
 ---@alias DbabSchemaConfig Dbab.SchemaConfig
 ---@alias DbabHistoryConfig Dbab.HistoryConfig

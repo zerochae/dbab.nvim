@@ -75,7 +75,7 @@ local function render_tree()
     local is_active = conn.name == connection.get_active_name()
     local is_expanded = M.expanded[conn.name]
 
-    local sidebar_cfg = config.get().ui.sidebar
+    local sidebar_cfg = config.get().sidebar
     local resolved_url = connection.resolve_url(conn.url)
     local db_type = connection.parse_type(resolved_url)
     local conn_icon = sidebar_cfg.use_brand_icon and icons.db(db_type) or icons.db_default
@@ -400,7 +400,7 @@ function M.apply_highlights()
     local loading_start = line:find(icons.loading, 1, true)
 
     if node.type == "connection" then
-      local use_brand = config.get().ui.sidebar.use_brand_color
+      local use_brand = config.get().sidebar.use_brand_color
       local db_hl = use_brand and db_hl_map[node.db_type] or nil
       local default_hl = "DbabIconDb"
       local tag_end = line:find("] ", 1, true)

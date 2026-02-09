@@ -5,7 +5,6 @@ local M = {}
 --- Layout presets
 ---@type table<string, { layout: Dbab.Layout, sidebar_width: number, history_width: number }>
 M.layout_presets = {
-  -- Classic 4-pane layout (default)
   classic = {
     layout = {
       { "sidebar", "editor" },
@@ -14,7 +13,6 @@ M.layout_presets = {
     sidebar_width = 0.2,
     history_width = 0.2,
   },
-  -- Wide top layout (3-column top, full-width bottom)
   wide = {
     layout = {
       { "sidebar", "editor", "history" },
@@ -28,36 +26,42 @@ M.layout_presets = {
 ---@type Dbab.Config
 M.defaults = {
   connections = {},
-  ui = {
-    layout = "classic", -- "classic" | "wide" | Dbab.Layout
-    sidebar = {
-      width = 0.2,
-      use_brand_icon = false,
-      use_brand_color = false,
-      show_brand_name = false,
-    },
-    history = {
-      width = 0.2,
-      style = "compact", -- "compact" = one line per entry, "detailed" = multi-line with full query
-    },
-    editor = {
-      show_tabbar = true,
-    },
-    grid = {
-      max_width = 120,
-      max_height = 20,
-      show_line_number = true,
-      header_align = "fit", -- "fit" = align metadata to grid width, "full" = align to window edge
-      style = "table", -- "table" (default), "json", "raw", "vertical", "markdown"
-    },
+  layout = "classic",
+  sidebar = {
+    width = 0.2,
+    use_brand_icon = false,
+    use_brand_color = false,
+    show_brand_name = false,
+  },
+  editor = {
+    show_tabbar = true,
+  },
+  grid = {
+    max_width = 120,
+    max_height = 20,
+    show_line_number = true,
+    header_align = "fit",
+    style = "table",
+  },
+  history = {
+    width = 0.2,
+    style = "compact",
+    max_entries = 100,
+    on_select = "execute",
+    persist = true,
+    filter_by_connection = true,
+    format = nil,
+    query_display = "auto",
+    short_hints = { "where", "join", "order", "group", "limit" },
+  },
+  schema = {
+    show_system_schemas = true,
   },
   keymaps = {
-    -- Global keymaps
     open = "<Leader>db",
     execute = "<CR>",
     close = "q",
 
-    -- Sidebar keymaps
     sidebar = {
       toggle_expand = { "<CR>", "o" },
       refresh = "R",
@@ -72,7 +76,6 @@ M.defaults = {
       to_history = "<S-Tab>",
     },
 
-    -- History keymaps
     history = {
       select = "<CR>",
       execute = "R",
@@ -83,7 +86,6 @@ M.defaults = {
       to_result = "<S-Tab>",
     },
 
-    -- Editor keymaps
     editor = {
       execute_insert = "<C-CR>",
       execute_leader = "<Leader>r",
@@ -95,7 +97,6 @@ M.defaults = {
       to_sidebar = "<S-Tab>",
     },
 
-    -- Result keymaps
     result = {
       yank_row = "y",
       yank_all = "Y",
@@ -103,53 +104,73 @@ M.defaults = {
       to_editor = "<S-Tab>",
     },
   },
-  schema = {
-    show_system_schemas = true,
-  },
-  history = {
-    max_entries = 100,
-    on_select = "execute",
-    persist = true,
-    filter_by_connection = true,
-    format = nil, -- nil = auto: {"time", "query", "duration"} or {"icon", "dbname", "time", "query", "duration"}
-    query_display = "auto", -- "short" = "SEL users", "full" = full query with syntax highlight, "auto" = full if fits
-    short_hints = { "where", "join", "order", "group", "limit" }, -- hints: ? WHERE, ⋈ JOIN, ↑↓ ORDER, ⊞ GROUP, ↓N LIMIT
-  },
   highlights = {},
 }
 
 ---@type Dbab.Config|nil
 M.options = nil
 
+--- Migrate legacy ui.* config to flat structure
+---@param opts table
+---@return table
+M._has_legacy_config = false
+
+local function migrate_legacy(opts)
+  if not opts.ui then
+    return opts
+  end
+
+  M._has_legacy_config = true
+  local ui = opts.ui
+  opts.ui = nil
+
+  if ui.layout and not opts.layout then
+    opts.layout = ui.layout
+  end
+  if ui.sidebar then
+    opts.sidebar = vim.tbl_deep_extend("force", opts.sidebar or {}, ui.sidebar)
+  end
+  if ui.editor then
+    opts.editor = vim.tbl_deep_extend("force", opts.editor or {}, ui.editor)
+  end
+  if ui.grid then
+    opts.grid = vim.tbl_deep_extend("force", opts.grid or {}, ui.grid)
+  end
+  if ui.history then
+    opts.history = vim.tbl_deep_extend("force", opts.history or {}, ui.history)
+  end
+
+  return opts
+end
+
 ---@param opts? Dbab.Config
 function M.setup(opts)
-  M.options = vim.tbl_deep_extend("force", {}, M.defaults, opts or {})
-
-  -- Apply layout preset if string
+  local user_opts = opts or {}
+  user_opts = migrate_legacy(user_opts)
+  M.options = vim.tbl_deep_extend("force", {}, M.defaults, user_opts)
   M._apply_layout_preset()
 end
 
---- Apply layout preset if ui.layout is a string
+--- Apply layout preset if layout is a string
 function M._apply_layout_preset()
-  if not M.options or not M.options.ui then
+  if not M.options then
     return
   end
 
-  local layout = M.options.ui.layout
+  local layout = M.options.layout
   if type(layout) == "string" then
     local preset = M.layout_presets[layout]
     if preset then
-      M.options.ui.layout = preset.layout
-      -- Only apply preset widths if user didn't override them
-      if M.options.ui.sidebar.width == M.defaults.ui.sidebar.width then
-        M.options.ui.sidebar.width = preset.sidebar_width
+      M.options.layout = preset.layout
+      if M.options.sidebar.width == M.defaults.sidebar.width then
+        M.options.sidebar.width = preset.sidebar_width
       end
-      if M.options.ui.history.width == M.defaults.ui.history.width then
-        M.options.ui.history.width = preset.history_width
+      if M.options.history.width == M.defaults.history.width then
+        M.options.history.width = preset.history_width
       end
     else
       vim.notify("[dbab] Unknown layout preset: " .. layout .. ". Using 'classic'.", vim.log.levels.WARN)
-      M.options.ui.layout = M.layout_presets.classic.layout
+      M.options.layout = M.layout_presets.classic.layout
     end
   end
 end

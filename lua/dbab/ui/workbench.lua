@@ -66,8 +66,8 @@ end
 local function calculate_row_widths(row, total_width)
   local cfg = config.get()
   local fixed_widths = {
-    sidebar = cfg.ui.sidebar.width,
-    history = cfg.ui.history.width,
+    sidebar = cfg.sidebar.width,
+    history = cfg.history.width,
   }
 
   local fixed_total = 0
@@ -296,7 +296,7 @@ function M.refresh_result_winbar()
     -- Calculate target width based on header_align setting
     local win_width = vim.api.nvim_win_get_width(M.result_win)
     local available_width = win_width - textoff
-    local header_align = cfg.ui.grid.header_align or "fit"
+    local header_align = cfg.grid.header_align or "fit"
 
     local target_width
     if header_align == "full" then
@@ -304,7 +304,7 @@ function M.refresh_result_winbar()
       target_width = available_width
     else
       -- "fit": align to grid width
-      local grid_width = M.last_grid_width or cfg.ui.grid.max_width
+      local grid_width = M.last_grid_width or cfg.grid.max_width
       target_width = math.min(grid_width, available_width)
     end
 
@@ -453,7 +453,7 @@ function M.refresh_tabbar()
   end
 
   local cfg = config.get()
-  if not cfg.ui.editor.show_tabbar then
+  if not cfg.editor.show_tabbar then
     vim.api.nvim_win_set_option(M.editor_win, "winbar", "")
     return
   end
@@ -1068,10 +1068,10 @@ function M.show_result(raw, elapsed)
   local cfg = config.get()
 
   if M.result_win and vim.api.nvim_win_is_valid(M.result_win) then
-    vim.api.nvim_win_set_option(M.result_win, "number", cfg.ui.grid.show_line_number)
+    vim.api.nvim_win_set_option(M.result_win, "number", cfg.grid.show_line_number)
   end
 
-  local result_style = cfg.ui.grid.style or "table"
+  local result_style = cfg.grid.style or "table"
   local result = parser.parse(raw, result_style)
   M.last_result = result
 
@@ -1253,10 +1253,14 @@ function M.open()
     M.cleanup()
   end
 
+  if config._has_legacy_config then
+    vim.notify("[dbab] You are using a legacy config (ui.*). Please check the new flat config structure.", vim.log.levels.WARN)
+  end
+
   delete_existing_buf("[dbab]")
 
   local cfg = config.get()
-  local layout = cfg.ui.layout or DEFAULT_LAYOUT
+  local layout = cfg.layout or DEFAULT_LAYOUT
 
   -- Validate layout
   local valid, err = validate_layout(layout)
@@ -1356,7 +1360,7 @@ function M._init_all_components(windows)
     vim.api.nvim_buf_set_option(M.result_buf, "modifiable", false)
     vim.api.nvim_win_set_option(M.result_win, "cursorline", true)
     vim.api.nvim_win_set_option(M.result_win, "wrap", false)
-    vim.api.nvim_win_set_option(M.result_win, "number", cfg.ui.grid.show_line_number)
+    vim.api.nvim_win_set_option(M.result_win, "number", cfg.grid.show_line_number)
     vim.api.nvim_win_set_option(M.result_win, "relativenumber", false)
     M.setup_result_keymaps()
     vim.schedule(function()
@@ -1431,10 +1435,10 @@ function M._setup_autocmds()
   })
 end
 
---- Resize layout based on current window size and config.ui.layout
+--- Resize layout based on current window size and config.layout
 function M._resize_layout()
   local cfg = config.get()
-  local layout = cfg.ui.layout or DEFAULT_LAYOUT
+  local layout = cfg.layout or DEFAULT_LAYOUT
   local total_width = vim.o.columns
   local total_height = vim.o.lines - 4
   local row_count = #layout

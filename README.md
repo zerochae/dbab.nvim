@@ -157,34 +157,35 @@ require("dbab").setup({
   connections = {
     { name = "local", url = "postgres://localhost/mydb" },
   },
-  ui = {
-    -- Layout preset: "classic" or "wide"
-    layout = "classic",
-    -- Or define custom layout:
-    -- layout = {
-    --   { "sidebar", "editor" },
-    --   { "history", "grid" },
-    -- },
-    sidebar = {
-      width = 0.2,
-      use_brand_icon = false,   -- true: per-DB icons, false: generic db icon
-      use_brand_color = false,  -- true: per-DB brand colors, false: single color (Number)
-      show_brand_name = false,  -- true: show [postgres] label, false: icon + name only
-    },
-    editor = {
-      show_tabbar = true,       -- show tab bar above editor
-    },
-    history = {
-      width = 0.2,
-      style = "compact", -- "compact" or "detailed"
-    },
-    grid = {
-      max_width = 120,
-      max_height = 20,
-      show_line_number = true,
-      header_align = "fit",  -- "fit" or "full"
-      style = "table", -- "table" (default), "json", "raw", "vertical", "markdown"
-    },
+  layout = "classic",  -- "classic" | "wide" | custom layout table
+  sidebar = {
+    width = 0.2,
+    use_brand_icon = false,   -- true: per-DB icons, false: generic db icon
+    use_brand_color = false,  -- true: per-DB brand colors, false: single color (Number)
+    show_brand_name = false,  -- true: show [postgres] label, false: icon + name only
+  },
+  editor = {
+    show_tabbar = true,       -- show tab bar above editor
+  },
+  grid = {
+    max_width = 120,
+    max_height = 20,
+    show_line_number = true,
+    header_align = "fit",     -- "fit" or "full"
+    style = "table",          -- "table", "json", "raw", "vertical", "markdown"
+  },
+  history = {
+    width = 0.2,
+    style = "compact",        -- "compact" or "detailed"
+    max_entries = 100,
+    on_select = "execute",    -- "execute" or "load"
+    persist = true,
+    filter_by_connection = true,
+    query_display = "auto",   -- "short", "full", or "auto"
+    short_hints = { "where", "join", "order", "group", "limit" },
+  },
+  schema = {
+    show_system_schemas = true,
   },
   keymaps = {
     open = "<Leader>db",
@@ -229,17 +230,6 @@ require("dbab").setup({
       to_editor = "<S-Tab>",
     },
   },
-  schema = {
-    show_system_schemas = true,
-  },
-  history = {
-    max_entries = 100,
-    on_select = "execute",          -- "execute" or "load"
-    persist = true,
-    filter_by_connection = true,
-    query_display = "auto",         -- "short", "full", or "auto"
-    short_hints = { "where", "join", "order", "group", "limit" },
-  },
   highlights = {
     -- Override any Dbab highlight group
     -- DbabHeader = { bg = "#ff6600", fg = "#000000" },
@@ -276,7 +266,7 @@ Components: `"sidebar"`, `"editor"`, `"history"`, `"grid"` (editor and grid are 
 
 ### Result Styles
 
-Configure with `ui.grid.style`:
+Configure with `grid.style`:
 
 | Style | Description |
 |-------|-------------|
@@ -287,11 +277,9 @@ Configure with `ui.grid.style`:
 | `"raw"` | Unprocessed CLI output |
 
 ```lua
-ui = {
-  grid = {
-    style = "vertical",
-  },
-}
+grid = {
+  style = "vertical",
+},
 ```
 
 #### table
@@ -317,7 +305,7 @@ ui = {
 
 ### History Styles
 
-Configure with `ui.history.style`:
+Configure with `history.style`:
 
 | Style | Description |
 |-------|-------------|
@@ -325,11 +313,9 @@ Configure with `ui.history.style`:
 | `"detailed"` | Multi-line: full query with syntax highlighting + metadata below |
 
 ```lua
-ui = {
-  history = {
-    style = "detailed",
-  },
-}
+history = {
+  style = "detailed",
+},
 ```
 
 ### Sidebar Display Options
@@ -337,13 +323,11 @@ ui = {
 Control how database connections appear in the sidebar:
 
 ```lua
-ui = {
-  sidebar = {
-    use_brand_icon = false,   -- default
-    use_brand_color = false,  -- default
-    show_brand_name = false,  -- default
-  },
-}
+sidebar = {
+  use_brand_icon = false,   -- default
+  use_brand_color = false,  -- default
+  show_brand_name = false,  -- default
+},
 ```
 
 | Option | `false` (default) | `true` |
