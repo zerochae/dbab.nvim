@@ -48,6 +48,7 @@ A lightweight database client for Neovim. Query databases directly from your edi
   - `psql` for PostgreSQL
   - `mysql` for MySQL
   - `sqlite3` for SQLite
+- [vim-dadbod](https://github.com/tpope/vim-dadbod)
 - [nui.nvim](https://github.com/MunifTanjim/nui.nvim)
 
 ## Installation
@@ -58,6 +59,7 @@ A lightweight database client for Neovim. Query databases directly from your edi
 {
   "zerochae/dbab.nvim",
   dependencies = {
+    "tpope/vim-dadbod",
     "MunifTanjim/nui.nvim",
     "hrsh7th/nvim-cmp", -- Optional: for autocompletion
   },
