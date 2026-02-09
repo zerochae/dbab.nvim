@@ -59,3 +59,9 @@ end, {
   end,
   desc = "Database client for Neovim",
 })
+
+vim.api.nvim_create_user_command("DbabClose", function()
+  require("dbab").close()
+end, {
+  desc = "Close the Dbab workbench",
+})

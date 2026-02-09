@@ -731,6 +731,9 @@ end
 
 --- Cleanup
 function M.cleanup()
+  if M.buf and vim.api.nvim_buf_is_valid(M.buf) then
+    pcall(vim.api.nvim_buf_delete, M.buf, { force = true })
+  end
   M.buf = nil
   M.win = nil
 end

@@ -1292,6 +1292,7 @@ function M.open()
 
   -- 새 탭 생성
   vim.cmd("tabnew")
+  local initial_buf = vim.api.nvim_get_current_buf()
   M.tab_nr = vim.api.nvim_get_current_tabpage()
 
   local total_width = vim.o.columns
@@ -1349,6 +1350,8 @@ function M.open()
 
   -- Step 5: 각 컴포넌트 초기화
   M._init_all_components(windows)
+
+  pcall(vim.api.nvim_buf_delete, initial_buf, { force = true })
 
   -- Sidebar로 포커스
   if M.sidebar_win and vim.api.nvim_win_is_valid(M.sidebar_win) then
