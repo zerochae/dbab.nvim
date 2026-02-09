@@ -12,6 +12,7 @@
 ---@field keymaps Dbab.Keymaps
 ---@field schema Dbab.SchemaConfig
 ---@field history Dbab.HistoryConfig
+---@field highlights? table<string, table> Highlight group overrides (nvim_set_hl opts)
 
 ---@class Dbab.Connection
 ---@field name string Connection display name
@@ -30,6 +31,7 @@
 
 ---@class Dbab.HistoryUIConfig
 ---@field width number Width as percentage (0.1~1.0)
+---@field style? "compact"|"detailed" History display style (default "compact")
 
 ---@alias Dbab.HeaderAlign "fit"|"full"
 
