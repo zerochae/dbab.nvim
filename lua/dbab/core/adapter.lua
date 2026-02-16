@@ -12,7 +12,17 @@ function M.parse_url(url)
 
   if result.scheme == "sqlite" then
     local path = url:match("^sqlite:///(.+)") or url:match("^sqlite://(.+)")
-    result.database = path or ""
+    if path then
+      if path:match("^/") or path:match("^%w+:") or path:match("^~") then
+        result.database = path
+      elseif path:match("^home/") or path:match("^Users/") or path:match("^tmp/") or path:match("^var/") or path:match("^etc/") or path:match("^usr/") then
+        result.database = "/" .. path
+      else
+        result.database = path
+      end
+    else
+      result.database = ""
+    end
     return result
   end
 
