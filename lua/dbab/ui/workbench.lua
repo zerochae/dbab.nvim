@@ -478,6 +478,24 @@ function M.get_active_tab()
   return nil
 end
 
+---@return string|nil conn_name
+---@return string|nil url
+function M.get_active_connection_context()
+  local active_tab = M.get_active_tab()
+  local conn_name = active_tab and active_tab.conn_name or nil
+
+  if conn_name then
+    local url = connection.get_resolved_url_by_name(conn_name)
+    if url then
+      return conn_name, url
+    end
+  end
+
+  local fallback_name = connection.get_active_name()
+  local fallback_url = connection.get_active_url()
+  return fallback_name, fallback_url
+end
+
 --- Switch to a specific tab
 ---@param index number
 function M.switch_tab(index)
@@ -1190,7 +1208,7 @@ function M.execute_query()
     return
   end
 
-  local url = connection.get_active_url()
+  local conn_name, url = M.get_active_connection_context()
   if not url then
     vim.notify("[dbab] No active connection", vim.log.levels.WARN)
     return
@@ -1210,7 +1228,7 @@ function M.execute_query()
   query_history.add({
     query = query,
     timestamp = os.time(),
-    conn_name = connection.get_active_name() or "unknown",
+    conn_name = conn_name or "unknown",
     duration_ms = elapsed,
     row_count = parsed_result and parsed_result.row_count or 0,
   })
@@ -1221,7 +1239,7 @@ function M.execute_query()
 
   M.last_query = query
   M.last_duration = elapsed
-  M.last_conn_name = connection.get_active_name()
+  M.last_conn_name = conn_name
   M.last_timestamp = os.time()
   M.show_result(result, elapsed)
 end
