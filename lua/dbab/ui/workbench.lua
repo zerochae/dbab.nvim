@@ -484,7 +484,7 @@ function M.get_active_connection_context()
   local active_tab = M.get_active_tab()
   local conn_name = active_tab and active_tab.conn_name or nil
 
-  if conn_name then
+  if conn_name and conn_name ~= "no connection" then
     local url = connection.get_resolved_url_by_name(conn_name)
     if url then
       return conn_name, url
@@ -496,12 +496,19 @@ function M.get_active_connection_context()
   return fallback_name, fallback_url
 end
 
+connection.context_provider = function()
+  return M.get_active_connection_context()
+end
+
 --- Switch to a specific tab
 ---@param index number
 function M.switch_tab(index)
   if index < 1 or index > #M.query_tabs then
     return
   end
+
+  local prev_conn = M.active_tab > 0 and M.active_tab <= #M.query_tabs
+    and M.query_tabs[M.active_tab].conn_name or nil
 
   M.active_tab = index
   local tab = M.query_tabs[index]
@@ -519,6 +526,13 @@ function M.switch_tab(index)
 
   M.refresh_tabbar()
   get_sidebar().refresh()
+
+  if prev_conn ~= tab.conn_name then
+    local cfg = config.get()
+    if cfg.history.filter_by_connection then
+      M.refresh_history()
+    end
+  end
 end
 
 --- Switch to next tab
@@ -1703,6 +1717,7 @@ function M.cleanup()
   M.last_result_width = nil
   M.query_tabs = {}
   M.active_tab = 0
+  connection.reset()
 end
 
 return M

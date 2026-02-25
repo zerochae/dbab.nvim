@@ -7,11 +7,8 @@ local icons = require "dbab.ui.icons"
 
 local M = {}
 
----@type boolean
-M.is_loading = false
-
----@type string|nil
-M.loading_conn_name = nil
+---@type table<string, boolean>
+M.loading_names = {}
 
 ---@type {name: string, conn_name: string, content: string}|nil
 M.clipboard = nil
@@ -84,7 +81,7 @@ local function render_tree()
     local conn_label = sidebar_cfg.show_brand_name and (" [" .. db_type .. "] ") or " "
     local conn_text = conn_icon .. conn_label .. conn.name
     local conn_status
-    if M.is_loading and conn.name == M.loading_conn_name then
+    if M.loading_names[conn.name] then
       conn_status = icons.loading .. " loading"
     elseif is_active or connection.is_connected(conn.name) then
       conn_status = icons.connected .. " connected"
@@ -274,7 +271,7 @@ local function render_tree()
             for _, sch in ipairs(db_schemas) do
               local schema_key = conn.name .. ".schema." .. sch.name
               local schema_expanded = M.expanded[schema_key]
-               local tables = schema_expanded and schema.get_tables(conn_url, sch.name) or {}
+              local tables = schema_expanded and schema.get_tables(conn_url, sch.name) or {}
               local table_count = schema_expanded and #tables or sch.table_count
 
               local schema_text = indent(2) .. icons.schema_node .. " " .. sch.name
@@ -305,7 +302,7 @@ local function render_tree()
                   })
 
                   if tbl_expanded then
-                     local columns = schema.get_columns(conn_url, tbl.name)
+                    local columns = schema.get_columns(conn_url, tbl.name)
                     for _, col in ipairs(columns) do
                       local col_icon = col.is_primary and icons.column_pk or icons.column
                       local type_hint = col.data_type and (" : " .. col.data_type) or ""
@@ -506,32 +503,34 @@ function M.toggle_node()
   if node.type == "connection" then
     M.expanded[node.name] = not M.expanded[node.name]
     if M.expanded[node.name] and node.name ~= connection.get_active_name() then
-      M.is_loading = true
-      M.loading_conn_name = node.name
+      M.loading_names[node.name] = true
       connection.set_active(node.name)
+      local active_tab = workbench.get_active_tab()
+      if active_tab then
+        active_tab.conn_name = node.name
+      end
       for _, tab in ipairs(workbench.query_tabs) do
         if tab.conn_name == "no connection" then
           tab.conn_name = node.name
         end
       end
       M.refresh()
+      workbench.refresh_history()
 
       local url = connection.get_active_url()
       if url then
         schema.get_schemas_async(url, function(schemas, err)
-            if err then
-              vim.notify("[dbab] Schema load error: " .. err, vim.log.levels.ERROR)
-              M.is_loading = false
-              M.loading_conn_name = nil
-              M.refresh()
-              return
-            end
+          if err then
+            vim.notify("[dbab] Schema load error: " .. err, vim.log.levels.ERROR)
+            M.loading_names[node.name] = nil
+            M.refresh()
+            return
+          end
 
           local pending = #schemas
-            if pending == 0 then
-              M.is_loading = false
-              M.loading_conn_name = nil
-              M.expanded[node.name] = true
+          if pending == 0 then
+            M.loading_names[node.name] = nil
+            M.expanded[node.name] = true
             M.expanded[node.name .. ".buffers"] = true
             M.expanded[node.name .. ".tables"] = true
             M.refresh()
@@ -544,8 +543,7 @@ function M.toggle_node()
             schema.get_tables_async(url, sch.name, function(_, _)
               pending = pending - 1
               if pending <= 0 then
-                M.is_loading = false
-                M.loading_conn_name = nil
+                M.loading_names[node.name] = nil
                 M.expanded[node.name] = true
                 M.expanded[node.name .. ".buffers"] = true
                 M.expanded[node.name .. ".tables"] = true
@@ -557,8 +555,7 @@ function M.toggle_node()
           end
         end)
       else
-        M.is_loading = false
-        M.loading_conn_name = nil
+        M.loading_names[node.name] = nil
         M.refresh()
       end
       return
@@ -885,8 +882,7 @@ function M.cleanup()
   M.buf = nil
   M.win = nil
   M.nodes = {}
-  M.is_loading = false
-  M.loading_conn_name = nil
+  M.loading_names = {}
 end
 
 return M

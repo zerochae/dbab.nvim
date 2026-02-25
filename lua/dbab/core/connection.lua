@@ -81,6 +81,21 @@ function M.is_connected(name)
   return M.connected_names[name] == true
 end
 
+---@param name string
+function M.disconnect(name)
+  M.connected_names[name] = nil
+  if M.active_name == name then
+    M.active_name = nil
+    M.active_url = nil
+  end
+end
+
+function M.reset()
+  M.active_url = nil
+  M.active_name = nil
+  M.connected_names = {}
+end
+
 ---@return string|nil
 function M.get_active_url()
   return M.active_url
@@ -88,6 +103,31 @@ end
 
 ---@return string|nil
 function M.get_active_name()
+  return M.active_name
+end
+
+---@type fun(): string|nil, string|nil
+M.context_provider = nil
+
+---@return string|nil
+function M.get_context_url()
+  if M.context_provider then
+    local _, url = M.context_provider()
+    if url then
+      return url
+    end
+  end
+  return M.active_url
+end
+
+---@return string|nil
+function M.get_context_name()
+  if M.context_provider then
+    local name = M.context_provider()
+    if name then
+      return name
+    end
+  end
   return M.active_name
 end
 
