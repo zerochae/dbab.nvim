@@ -6,36 +6,44 @@ local M = {}
 
 -- In-memory cache for schema data
 local cache = {
-  url = nil,
-  schemas = nil,
-  tables = {}, -- schema_name -> tables
-  columns = {}, -- table_name -> columns
+  by_url = {},
 }
 
---- Clear cache (call when connection changes)
-function M.clear_cache()
-  cache.url = nil
-  cache.schemas = nil
-  cache.tables = {}
-  cache.columns = {}
+---@param url string
+---@return table
+local function get_url_cache(url)
+  if not cache.by_url[url] then
+    cache.by_url[url] = {
+      schemas = nil,
+      tables = {},
+      columns = {},
+    }
+  end
+  return cache.by_url[url]
 end
 
---- Check if cache is valid for current URL
-local function is_cache_valid(url)
-  return cache.url == url
+--- Clear cache (call when connection changes)
+---@param url? string
+function M.clear_cache(url)
+  if url then
+    cache.by_url[url] = nil
+    return
+  end
+  cache.by_url = {}
 end
 
 --- Get cached table names only (NO DB queries, for CMP)
 ---@param url string
 ---@return string[]
 function M.get_cached_table_names(url)
-  if not is_cache_valid(url) then
+  local url_cache = cache.by_url[url]
+  if not url_cache then
     return {}
   end
 
   local names = {}
   local seen = {}
-  for _, tables in pairs(cache.tables) do
+  for _, tables in pairs(url_cache.tables) do
     for _, tbl in ipairs(tables) do
       if not seen[tbl.name] then
         seen[tbl.name] = true
@@ -50,13 +58,14 @@ end
 ---@param url string
 ---@return Dbab.Column[]
 function M.get_cached_columns(url)
-  if not is_cache_valid(url) then
+  local url_cache = cache.by_url[url]
+  if not url_cache then
     return {}
   end
 
   local all = {}
   local seen = {}
-  for _, columns in pairs(cache.columns) do
+  for _, columns in pairs(url_cache.columns) do
     for _, col in ipairs(columns) do
       if not seen[col.name] then
         seen[col.name] = true
@@ -71,7 +80,8 @@ end
 ---@param url string
 ---@return boolean
 function M.has_cache(url)
-  return is_cache_valid(url) and cache.schemas ~= nil
+  local url_cache = cache.by_url[url]
+  return url_cache ~= nil and url_cache.schemas ~= nil
 end
 
 --- See lua/dbab/types.lua for type definitions (Dbab.Schema, Dbab.Table, Dbab.Column)
@@ -79,15 +89,11 @@ end
 ---@param url string
 ---@return Dbab.Schema[]
 function M.get_schemas(url)
-  -- Return cached if valid
-  if is_cache_valid(url) and cache.schemas then
-    return cache.schemas
-  end
+  local url_cache = get_url_cache(url)
 
-  -- URL changed, clear old cache
-  if not is_cache_valid(url) then
-    M.clear_cache()
-    cache.url = url
+  -- Return cached if valid
+  if url_cache.schemas then
+    return url_cache.schemas
   end
 
   local db_type = connection.parse_type(url)
@@ -117,15 +123,15 @@ function M.get_schemas(url)
     ]]
   elseif db_type == "sqlite" then
     -- SQLite doesn't have schemas, return a fake "main" schema
-    cache.schemas = { { name = "main", table_count = 0 } }
-    return cache.schemas
+    url_cache.schemas = { { name = "main", table_count = 0 } }
+    return url_cache.schemas
   else
     return {}
   end
 
   local result = executor.execute(url, query)
-  cache.schemas = M.parse_schemas(result)
-  return cache.schemas
+  url_cache.schemas = M.parse_schemas(result)
+  return url_cache.schemas
 end
 
 ---@param raw string
@@ -185,10 +191,11 @@ end
 ---@return Dbab.Table[]
 function M.get_tables(url, schema_name)
   schema_name = schema_name or "public"
+  local url_cache = get_url_cache(url)
 
   -- Return cached if valid
-  if is_cache_valid(url) and cache.tables[schema_name] then
-    return cache.tables[schema_name]
+  if url_cache.tables[schema_name] then
+    return url_cache.tables[schema_name]
   end
 
   local db_type = connection.parse_type(url)
@@ -220,8 +227,8 @@ function M.get_tables(url, schema_name)
   end
 
   local result = executor.execute(url, query)
-  cache.tables[schema_name] = M.parse_tables(result, db_type)
-  return cache.tables[schema_name]
+  url_cache.tables[schema_name] = M.parse_tables(result, db_type)
+  return url_cache.tables[schema_name]
 end
 
 ---@param raw string
@@ -301,9 +308,11 @@ end
 ---@param table_name string
 ---@return Dbab.Column[]
 function M.get_columns(url, table_name)
+  local url_cache = get_url_cache(url)
+
   -- Return cached if valid
-  if is_cache_valid(url) and cache.columns[table_name] then
-    return cache.columns[table_name]
+  if url_cache.columns[table_name] then
+    return url_cache.columns[table_name]
   end
 
   local db_type = connection.parse_type(url)
@@ -345,8 +354,8 @@ function M.get_columns(url, table_name)
   end
 
   local result = executor.execute(url, query)
-  cache.columns[table_name] = M.parse_columns(result, db_type)
-  return cache.columns[table_name]
+  url_cache.columns[table_name] = M.parse_columns(result, db_type)
+  return url_cache.columns[table_name]
 end
 
 ---@param raw string
@@ -430,18 +439,14 @@ end
 ---@param url string
 ---@param callback fun(schemas: Dbab.Schema[], err: string|nil)
 function M.get_schemas_async(url, callback)
+  local url_cache = get_url_cache(url)
+
   -- Return cached if valid
-  if is_cache_valid(url) and cache.schemas then
+  if url_cache.schemas then
     vim.schedule(function()
-      callback(cache.schemas, nil)
+      callback(url_cache.schemas, nil)
     end)
     return
-  end
-
-  -- URL changed, clear old cache
-  if not is_cache_valid(url) then
-    M.clear_cache()
-    cache.url = url
   end
 
   local db_type = connection.parse_type(url)
@@ -470,9 +475,9 @@ function M.get_schemas_async(url, callback)
       WHERE schema_name = DATABASE()
     ]]
   elseif db_type == "sqlite" then
-    cache.schemas = { { name = "main", table_count = 0 } }
+    url_cache.schemas = { { name = "main", table_count = 0 } }
     vim.schedule(function()
-      callback(cache.schemas, nil)
+      callback(url_cache.schemas, nil)
     end)
     return
   else
@@ -487,8 +492,8 @@ function M.get_schemas_async(url, callback)
       callback({}, err)
       return
     end
-    cache.schemas = M.parse_schemas(result)
-    callback(cache.schemas, nil)
+    url_cache.schemas = M.parse_schemas(result)
+    callback(url_cache.schemas, nil)
   end)
 end
 
@@ -497,11 +502,12 @@ end
 ---@param callback fun(tables: Dbab.Table[], err: string|nil)
 function M.get_tables_async(url, schema_name, callback)
   schema_name = schema_name or "public"
+  local url_cache = get_url_cache(url)
 
   -- Return cached if valid
-  if is_cache_valid(url) and cache.tables[schema_name] then
+  if url_cache.tables[schema_name] then
     vim.schedule(function()
-      callback(cache.tables[schema_name], nil)
+      callback(url_cache.tables[schema_name], nil)
     end)
     return
   end
@@ -542,8 +548,8 @@ function M.get_tables_async(url, schema_name, callback)
       callback({}, err)
       return
     end
-    cache.tables[schema_name] = M.parse_tables(result, db_type)
-    callback(cache.tables[schema_name], nil)
+    url_cache.tables[schema_name] = M.parse_tables(result, db_type)
+    callback(url_cache.tables[schema_name], nil)
   end)
 end
 
@@ -551,10 +557,12 @@ end
 ---@param table_name string
 ---@param callback fun(columns: Dbab.Column[], err: string|nil)
 function M.get_columns_async(url, table_name, callback)
+  local url_cache = get_url_cache(url)
+
   -- Return cached if valid
-  if is_cache_valid(url) and cache.columns[table_name] then
+  if url_cache.columns[table_name] then
     vim.schedule(function()
-      callback(cache.columns[table_name], nil)
+      callback(url_cache.columns[table_name], nil)
     end)
     return
   end
@@ -605,8 +613,8 @@ function M.get_columns_async(url, table_name, callback)
       callback({}, err)
       return
     end
-    cache.columns[table_name] = M.parse_columns(result, db_type)
-    callback(cache.columns[table_name], nil)
+    url_cache.columns[table_name] = M.parse_columns(result, db_type)
+    callback(url_cache.columns[table_name], nil)
   end)
 end
 

@@ -20,13 +20,13 @@ local function cli_execute(url, query)
   local adapter = require("dbab.core.adapter")
   local command, args = adapter.build_cmd(url)
 
-  local cmd_parts = { command }
+  local cmd_list = { command }
   for _, arg in ipairs(args) do
-    table.insert(cmd_parts, arg)
+    table.insert(cmd_list, arg)
   end
-  local cmd_str = table.concat(cmd_parts, " ")
 
-  local lines = vim.fn.systemlist(cmd_str, query)
+  -- Use list form to avoid shell expansion (e.g. '?' in URLs under zsh)
+  local lines = vim.fn.systemlist(cmd_list, query)
   return table.concat(lines, "\n")
 end
 

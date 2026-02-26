@@ -3,6 +3,18 @@ local connection = require("dbab.core.connection")
 
 local source = {}
 
+---@return string|nil
+local function get_context_url()
+  local ok, workbench = pcall(require, "dbab.ui.workbench")
+  if ok and workbench and workbench.get_active_connection_context then
+    local _, tab_url = workbench.get_active_connection_context()
+    if tab_url then
+      return tab_url
+    end
+  end
+  return connection.get_active_url()
+end
+
 local kinds
 local keyword_items
 
@@ -46,7 +58,7 @@ end
 
 function source:enabled()
   local ft = vim.bo.filetype
-  return (ft == "sql" or ft == "dbab_editor") and connection.get_active_url() ~= nil
+  return (ft == "sql" or ft == "dbab_editor") and get_context_url() ~= nil
 end
 
 function source:get_trigger_characters()
@@ -66,7 +78,8 @@ function source:get_completions(_, callback)
     table.insert(items, vim.deepcopy(item))
   end
 
-  local tables = cache.get_table_names_cached()
+  local context_url = get_context_url()
+  local tables = cache.get_table_names_cached(context_url)
   for _, tbl in ipairs(tables) do
     if not seen[tbl] then
       seen[tbl] = true
@@ -79,7 +92,7 @@ function source:get_completions(_, callback)
     end
   end
 
-  local columns = cache.get_all_columns_cached()
+  local columns = cache.get_all_columns_cached(context_url)
   for _, col in ipairs(columns) do
     if not seen[col.name] then
       seen[col.name] = true

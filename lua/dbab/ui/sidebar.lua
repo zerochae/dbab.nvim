@@ -10,6 +10,9 @@ local M = {}
 ---@type boolean
 M.is_loading = false
 
+---@type string|nil
+M.loading_conn_name = nil
+
 ---@type {name: string, conn_name: string, content: string}|nil
 M.clipboard = nil
 
@@ -58,7 +61,6 @@ end
 ---@return string[]
 local function render_tree()
   local lines = {}
-  local url = connection.get_active_url()
   local sidebar_width = 30
 
   local connections = connection.list_connections()
@@ -82,9 +84,9 @@ local function render_tree()
     local conn_label = sidebar_cfg.show_brand_name and (" [" .. db_type .. "] ") or " "
     local conn_text = conn_icon .. conn_label .. conn.name
     local conn_status
-    if is_active and M.is_loading then
+    if M.is_loading and conn.name == M.loading_conn_name then
       conn_status = icons.loading .. " loading"
-    elseif is_active then
+    elseif is_active or connection.is_connected(conn.name) then
       conn_status = icons.connected .. " connected"
     else
       conn_status = icons.idle .. " idle"
@@ -99,7 +101,9 @@ local function render_tree()
       db_type = db_type,
     })
 
-    if is_expanded and is_active and url and not M.is_loading then
+    local conn_url = connection.resolve_url(conn.url)
+
+    if is_expanded and conn_url then
       local open_tabs = workbench.query_tabs or {}
       local unsaved_buffers = {}
       local open_saved_map = {}
@@ -185,8 +189,8 @@ local function render_tree()
 
       -- Schema/table content
       do
-        local schema_db_type = connection.parse_type(url)
-        local db_schemas = schema.get_schemas(url)
+        local schema_db_type = connection.parse_type(conn_url)
+        local db_schemas = schema.get_schemas(conn_url)
 
         if schema_db_type == "mysql" or schema_db_type == "sqlite" then
           local tables_key = conn.name .. ".tables"
@@ -196,7 +200,7 @@ local function render_tree()
 
           if #db_schemas > 0 then
             if tables_expanded then
-              all_tables = schema.get_tables(url, db_schemas[1].name)
+              all_tables = schema.get_tables(conn_url, db_schemas[1].name)
               total_count = #all_tables
             else
               total_count = db_schemas[1].table_count
@@ -231,7 +235,7 @@ local function render_tree()
               })
 
               if tbl_expanded then
-                local columns = schema.get_columns(url, tbl.name)
+                local columns = schema.get_columns(conn_url, tbl.name)
                 for _, col in ipairs(columns) do
                   local col_icon = col.is_primary and icons.column_pk or icons.column
                   local type_hint = col.data_type and (" : " .. col.data_type) or ""
@@ -270,7 +274,7 @@ local function render_tree()
             for _, sch in ipairs(db_schemas) do
               local schema_key = conn.name .. ".schema." .. sch.name
               local schema_expanded = M.expanded[schema_key]
-              local tables = schema_expanded and schema.get_tables(url, sch.name) or {}
+               local tables = schema_expanded and schema.get_tables(conn_url, sch.name) or {}
               local table_count = schema_expanded and #tables or sch.table_count
 
               local schema_text = indent(2) .. icons.schema_node .. " " .. sch.name
@@ -301,7 +305,7 @@ local function render_tree()
                   })
 
                   if tbl_expanded then
-                    local columns = schema.get_columns(url, tbl.name)
+                     local columns = schema.get_columns(conn_url, tbl.name)
                     for _, col in ipairs(columns) do
                       local col_icon = col.is_primary and icons.column_pk or icons.column
                       local type_hint = col.data_type and (" : " .. col.data_type) or ""
@@ -503,6 +507,7 @@ function M.toggle_node()
     M.expanded[node.name] = not M.expanded[node.name]
     if M.expanded[node.name] and node.name ~= connection.get_active_name() then
       M.is_loading = true
+      M.loading_conn_name = node.name
       connection.set_active(node.name)
       for _, tab in ipairs(workbench.query_tabs) do
         if tab.conn_name == "no connection" then
@@ -514,17 +519,19 @@ function M.toggle_node()
       local url = connection.get_active_url()
       if url then
         schema.get_schemas_async(url, function(schemas, err)
-          if err then
-            vim.notify("[dbab] Schema load error: " .. err, vim.log.levels.ERROR)
-            M.is_loading = false
-            M.refresh()
-            return
-          end
+            if err then
+              vim.notify("[dbab] Schema load error: " .. err, vim.log.levels.ERROR)
+              M.is_loading = false
+              M.loading_conn_name = nil
+              M.refresh()
+              return
+            end
 
           local pending = #schemas
-          if pending == 0 then
-            M.is_loading = false
-            M.expanded[node.name] = true
+            if pending == 0 then
+              M.is_loading = false
+              M.loading_conn_name = nil
+              M.expanded[node.name] = true
             M.expanded[node.name .. ".buffers"] = true
             M.expanded[node.name .. ".tables"] = true
             M.refresh()
@@ -538,6 +545,7 @@ function M.toggle_node()
               pending = pending - 1
               if pending <= 0 then
                 M.is_loading = false
+                M.loading_conn_name = nil
                 M.expanded[node.name] = true
                 M.expanded[node.name .. ".buffers"] = true
                 M.expanded[node.name .. ".tables"] = true
@@ -550,6 +558,7 @@ function M.toggle_node()
         end)
       else
         M.is_loading = false
+        M.loading_conn_name = nil
         M.refresh()
       end
       return
@@ -876,6 +885,8 @@ function M.cleanup()
   M.buf = nil
   M.win = nil
   M.nodes = {}
+  M.is_loading = false
+  M.loading_conn_name = nil
 end
 
 return M

@@ -14,6 +14,7 @@ describe("connection", function()
     })
     connection.active_url = nil
     connection.active_name = nil
+    connection.connected_names = {}
   end)
 
   describe("parse_type", function()
@@ -79,6 +80,20 @@ describe("connection", function()
     end)
   end)
 
+  describe("get_resolved_url_by_name", function()
+    it("returns resolved URL for existing connection", function()
+      vim.fn.setenv("TEST_DB_URL", "postgres://resolved-from-env/db")
+      local url = connection.get_resolved_url_by_name("env_conn")
+      assert.are.equal("postgres://resolved-from-env/db", url)
+      vim.fn.setenv("TEST_DB_URL", nil)
+    end)
+
+    it("returns nil for unknown connection", function()
+      local url = connection.get_resolved_url_by_name("missing_conn")
+      assert.is_nil(url)
+    end)
+  end)
+
   describe("set_active", function()
     it("sets active connection when found", function()
       local result = connection.set_active("test_pg")
@@ -101,6 +116,21 @@ describe("connection", function()
       assert.are.equal("postgres://env/db", connection.get_active_url())
 
       vim.fn.setenv("TEST_DB_URL", nil)
+    end)
+
+    it("keeps previously selected connections marked as connected", function()
+      connection.set_active("test_pg")
+      connection.set_active("test_mysql")
+
+      assert.is_true(connection.is_connected("test_pg"))
+      assert.is_true(connection.is_connected("test_mysql"))
+      assert.is_false(connection.is_connected("test_sqlite"))
+    end)
+  end)
+
+  describe("is_connected", function()
+    it("returns false before activation", function()
+      assert.is_false(connection.is_connected("test_pg"))
     end)
   end)
 

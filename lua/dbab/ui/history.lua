@@ -7,6 +7,18 @@ local icons = require("dbab.ui.icons")
 
 local M = {}
 
+---@return string|nil
+local function get_current_connection_name()
+  local ok, workbench = pcall(require, "dbab.ui.workbench")
+  if ok and workbench and workbench.get_active_connection_context then
+    local conn_name = workbench.get_active_connection_context()
+    if conn_name then
+      return conn_name
+    end
+  end
+  return connection.get_active_name()
+end
+
 ---@type number|nil
 M.buf = nil
 
@@ -653,7 +665,7 @@ function M.render()
   local entries = {}
 
   if cfg.history.filter_by_connection then
-    local current_conn = connection.get_active_name()
+    local current_conn = get_current_connection_name()
     if current_conn then
       for _, entry in ipairs(all_entries) do
         if entry.conn_name == current_conn then
@@ -670,7 +682,7 @@ function M.render()
 
   local winbar_text = "%#DbabHistoryHeader#" .. icons.history .. " " .. "History%*"
   if cfg.history.filter_by_connection then
-    local current_conn = connection.get_active_name()
+    local current_conn = get_current_connection_name()
     if current_conn then
       local conn_icon = icons.db_default .. " "
       winbar_text = "%#DbabHistoryHeader#" .. icons.history .. " " .. "History %#NonText#[%#DbabSidebarIconConnection#" .. conn_icon .. "%#Normal#" .. current_conn .. "%#NonText#]%*"
@@ -689,7 +701,7 @@ function M.render()
 
   if #entries == 0 then
     local empty_msg = "  No history yet"
-    if cfg.history.filter_by_connection and not connection.get_active_name() then
+    if cfg.history.filter_by_connection and not get_current_connection_name() then
       empty_msg = "  Connect to DB first"
     end
     table.insert(lines, empty_msg)
@@ -741,7 +753,7 @@ local function get_filtered_entries()
   local all_entries = history.get_all()
 
   if cfg.history.filter_by_connection then
-    local current_conn = connection.get_active_name()
+    local current_conn = get_current_connection_name()
     if current_conn then
       local filtered = {}
       for _, entry in ipairs(all_entries) do

@@ -8,6 +8,9 @@ M.active_url = nil
 ---@type string|nil
 M.active_name = nil
 
+---@type table<string, boolean>
+M.connected_names = {}
+
 ---@param url string
 ---@return string type Database type (postgres, mysql, sqlite, etc.)
 function M.parse_type(url)
@@ -50,15 +53,32 @@ function M.get_connection_by_name(name)
 end
 
 ---@param name string
+---@return string|nil
+function M.get_resolved_url_by_name(name)
+  local conn = M.get_connection_by_name(name)
+  if not conn then
+    return nil
+  end
+  return M.resolve_url(conn.url)
+end
+
+---@param name string
 ---@return boolean
 function M.set_active(name)
   local conn = M.get_connection_by_name(name)
   if conn then
     M.active_name = conn.name
     M.active_url = M.resolve_url(conn.url)
+    M.connected_names[conn.name] = true
     return true
   end
   return false
+end
+
+---@param name string
+---@return boolean
+function M.is_connected(name)
+  return M.connected_names[name] == true
 end
 
 ---@return string|nil
