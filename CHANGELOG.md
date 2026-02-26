@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0](https://github.com/zerochae/dbab.nvim/compare/v1.0.0...v1.1.0) (2026-02-26)
+
+
+### Features
+
+* phase 1 isolate schema cache per connection URL ([f2d6394](https://github.com/zerochae/dbab.nvim/commit/f2d6394e081ad102a321f2e2852623c58f6e316c))
+* phase 2 apply tab-aware connection context across UI and completion ([d185503](https://github.com/zerochae/dbab.nvim/commit/d185503538fd708490482b202ed91a0f2e71fbac))
+* support per-tab connection context and URL-isolated cache ([938c387](https://github.com/zerochae/dbab.nvim/commit/938c3870f48a534e88a1bc469815ede6bb272cc1))
+
+
+### Bug Fixes
+
+* phase 3 avoid zsh glob expansion in cli executor ([2e0ae67](https://github.com/zerochae/dbab.nvim/commit/2e0ae677cef7da93623c02ac24e370a3a6bf6c82))
+
 ## 1.0.0 (2026-02-19)
 
 
