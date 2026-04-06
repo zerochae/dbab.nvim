@@ -820,6 +820,8 @@ function M.setup_keymaps()
 		local query = M.insert_table_query()
 		if query then
 			workbench.open_editor_with_query(query)
+		else
+			vim.notify("[dbab] Select a table or view to insert query", vim.log.levels.WARN)
 		end
 	end)
 
@@ -860,6 +862,8 @@ function M.setup_keymaps()
 					}
 					vim.notify("[dbab] Copied: " .. node.name, vim.log.levels.INFO)
 				end
+			else
+				vim.notify("[dbab] Select a saved query to copy", vim.log.levels.WARN)
 			end
 		end
 	end)
@@ -911,6 +915,10 @@ function M.setup_keymaps()
 		if workbench.history_win and vim.api.nvim_win_is_valid(workbench.history_win) then
 			vim.api.nvim_set_current_win(workbench.history_win)
 		end
+	end)
+
+	map("?", function()
+		require("dbab.ui.help").show_sidebar()
 	end)
 end
 

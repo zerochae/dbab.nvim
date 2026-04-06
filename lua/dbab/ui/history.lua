@@ -274,16 +274,13 @@ local function render_compact(entries, win_width, cfg)
 			if where_col then
 				local value_start = #result + 1
 				result = result .. " " .. where_col
-				table.insert(
-					positions,
-					{
-						hint = "where",
-						symbol_start = symbol_start,
-						symbol_end = symbol_end,
-						value_start = value_start,
-						value_end = #result,
-					}
-				)
+				table.insert(positions, {
+					hint = "where",
+					symbol_start = symbol_start,
+					symbol_end = symbol_end,
+					value_start = value_start,
+					value_end = #result,
+				})
 			else
 				table.insert(positions, { hint = "where", symbol_start = symbol_start, symbol_end = symbol_end })
 			end
@@ -299,16 +296,13 @@ local function render_compact(entries, win_width, cfg)
 			if join_table then
 				local value_start = #result + 1
 				result = result .. " " .. join_table
-				table.insert(
-					positions,
-					{
-						hint = "join",
-						symbol_start = symbol_start,
-						symbol_end = symbol_end,
-						value_start = value_start,
-						value_end = #result,
-					}
-				)
+				table.insert(positions, {
+					hint = "join",
+					symbol_start = symbol_start,
+					symbol_end = symbol_end,
+					value_start = value_start,
+					value_end = #result,
+				})
 			else
 				table.insert(positions, { hint = "join", symbol_start = symbol_start, symbol_end = symbol_end })
 			end
@@ -327,16 +321,13 @@ local function render_compact(entries, win_width, cfg)
 				local symbol_end = #result
 				local value_start = #result + 1
 				result = result .. " " .. order_col
-				table.insert(
-					positions,
-					{
-						hint = "order",
-						symbol_start = symbol_start,
-						symbol_end = symbol_end,
-						value_start = value_start,
-						value_end = #result,
-					}
-				)
+				table.insert(positions, {
+					hint = "order",
+					symbol_start = symbol_start,
+					symbol_end = symbol_end,
+					value_start = value_start,
+					value_end = #result,
+				})
 			end
 		end
 
@@ -352,16 +343,13 @@ local function render_compact(entries, win_width, cfg)
 				local symbol_end = #result
 				local value_start = #result + 1
 				result = result .. " " .. group_col
-				table.insert(
-					positions,
-					{
-						hint = "group",
-						symbol_start = symbol_start,
-						symbol_end = symbol_end,
-						value_start = value_start,
-						value_end = #result,
-					}
-				)
+				table.insert(positions, {
+					hint = "group",
+					symbol_start = symbol_start,
+					symbol_end = symbol_end,
+					value_start = value_start,
+					value_end = #result,
+				})
 			end
 		end
 
@@ -934,6 +922,10 @@ function M.setup_keymaps(buf)
 		if workbench.result_win and vim.api.nvim_win_is_valid(workbench.result_win) then
 			vim.api.nvim_set_current_win(workbench.result_win)
 		end
+	end, opts)
+
+	vim.keymap.set("n", "?", function()
+		require("dbab.ui.help").show_history()
 	end, opts)
 end
 

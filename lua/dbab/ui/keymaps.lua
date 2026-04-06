@@ -41,6 +41,10 @@ function M.setup_result_keymaps()
 	vim.keymap.set("n", config.get().keymaps.close, function()
 		workbench.close()
 	end, result_opts)
+
+	vim.keymap.set("n", "?", function()
+		require("dbab.ui.help").show_result()
+	end, result_opts)
 end
 
 ---@param buf number
@@ -101,6 +105,10 @@ function M.setup_editor_keymaps(buf)
 
 	vim.keymap.set("n", config.get().keymaps.close, function()
 		workbench.close()
+	end, opts)
+
+	vim.keymap.set("n", "?", function()
+		require("dbab.ui.help").show_editor()
 	end, opts)
 end
 
