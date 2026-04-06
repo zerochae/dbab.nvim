@@ -1,5 +1,5 @@
 local M = {}
 
-M.parser = require "dbab.utils.parser"
+M.parser = require("dbab.utils.parser")
 
 return M

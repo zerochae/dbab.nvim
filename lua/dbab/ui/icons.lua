@@ -62,36 +62,36 @@ local M = {
 -- stylua: ignore end
 
 M.db_map = {
-  postgres = M.postgres,
-  mysql = M.mysql,
-  mariadb = M.mariadb,
-  sqlite = M.sqlite,
-  redis = M.redis,
-  mongodb = M.mongodb,
-  unknown = M.db_default,
+	postgres = M.postgres,
+	mysql = M.mysql,
+	mariadb = M.mariadb,
+	sqlite = M.sqlite,
+	redis = M.redis,
+	mongodb = M.mongodb,
+	unknown = M.db_default,
 }
 
 M.verb_map = {
-  SEL = M.verb_select,
-  INS = M.verb_insert,
-  UPD = M.verb_update,
-  DEL = M.verb_delete,
-  CRT = M.verb_create,
-  DRP = M.verb_drop,
-  ALT = M.verb_alter,
-  TRC = M.verb_truncate,
+	SEL = M.verb_select,
+	INS = M.verb_insert,
+	UPD = M.verb_update,
+	DEL = M.verb_delete,
+	CRT = M.verb_create,
+	DRP = M.verb_drop,
+	ALT = M.verb_alter,
+	TRC = M.verb_truncate,
 }
 
 ---@param db_type string
 ---@return string
 function M.db(db_type)
-  return M.db_map[db_type] or M.db_default
+	return M.db_map[db_type] or M.db_default
 end
 
 ---@param verb string
 ---@return string
 function M.verb(verb)
-  return (M.verb_map[verb] or M.verb_default) .. " "
+	return (M.verb_map[verb] or M.verb_default) .. " "
 end
 
 return M

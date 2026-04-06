@@ -44,7 +44,6 @@
 ---@field header_align Dbab.HeaderAlign Winbar metadata alignment ("fit" = align to grid, "full" = align to window edge)
 ---@field style? Dbab.ResultStyle Result display style
 
-
 ---@alias Dbab.HistoryField "icon"|"time"|"dbname"|"query"|"duration"
 
 ---@alias Dbab.ShortHint "where"|"join"|"order"|"group"|"limit"
