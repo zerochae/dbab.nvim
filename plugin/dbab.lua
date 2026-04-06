@@ -66,3 +66,9 @@ vim.api.nvim_create_user_command("DbabClose", function()
 end, {
 	desc = "Close the Dbab workbench",
 })
+
+vim.api.nvim_create_user_command("DbabRestore", function()
+  require("dbab").restore()
+end, {
+  desc = "Restore the Dbab workbench layout",
+})
