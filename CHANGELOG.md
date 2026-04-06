@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/zerochae/dbab.nvim/compare/v1.1.0...v1.2.0) (2026-04-06)
+
+
+### Features
+
+* **#3:** add help popup (?) and improve sidebar action feedback ([c326140](https://github.com/zerochae/dbab.nvim/commit/c32614035bdc18dd24bb74a7f136bfa66f085fad))
+
 ## [1.1.0](https://github.com/zerochae/dbab.nvim/compare/v1.0.0...v1.1.0) (2026-02-26)
 
 
